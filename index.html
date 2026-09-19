@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Junior Tournament Tracker</title>
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tournaments">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%230071e3' stroke-width='8'/%3E%3Cpath d='M18 20a58 58 0 0 1 0 60M82 20a58 58 0 0 0 0 60' stroke='%230071e3' stroke-width='8' fill='none'/%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   Design tokens
+   ============================================================ */
+:root{
+  --bg:#f5f5f7;
+  --surface:#ffffff;
+  --surface-2:#f0f0f3;
+  --surface-3:#e8e8ed;
+  --line:rgba(0,0,0,.09);
+  --line-strong:rgba(0,0,0,.16);
+  --ink:#1d1d1f;
+  --ink-2:#6e6e73;
+  --ink-3:#8e8e93;
+  --accent:#0071e3;
+  --accent-ink:#ffffff;
+  --accent-soft:rgba(0,113,227,.10);
+  --ok:#1d8f47; --ok-soft:rgba(48,209,88,.14);
+  --warn:#b25e00; --warn-soft:rgba(255,159,10,.16);
+  --hot:#d70015;  --hot-soft:rgba(255,69,58,.14);
+  --dead:#8e8e93; --dead-soft:rgba(142,142,147,.14);
+  --nav:rgba(255,255,255,.72);
+  --shadow-1:0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.05);
+  --shadow-2:0 2px 6px rgba(0,0,0,.07), 0 14px 40px rgba(0,0,0,.10);
+  --shadow-pop:0 20px 60px rgba(0,0,0,.24);
+  --r-lg:22px; --r-md:16px; --r-sm:11px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-soft:cubic-bezier(.4,0,.2,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000;
+    --surface:#161618;
+    --surface-2:#232326;
+    --surface-3:#2f2f33;
+    --line:rgba(255,255,255,.10);
+    --line-strong:rgba(255,255,255,.20);
+    --ink:#f5f5f7;
+    --ink-2:#a1a1a6;
+    --ink-3:#78787d;
+    --accent:#0a84ff;
+    --accent-soft:rgba(10,132,255,.18);
+    --ok:#30d158; --ok-soft:rgba(48,209,88,.16);
+    --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16);
+    --hot:#ff453a;  --hot-soft:rgba(255,69,58,.18);
+    --dead:#78787d; --dead-soft:rgba(120,120,125,.18);
+    --nav:rgba(10,10,11,.72);
+    --shadow-1:0 1px 2px rgba(0,0,0,.6), 0 4px 16px rgba(0,0,0,.4);
+    --shadow-2:0 2px 6px rgba(0,0,0,.6), 0 14px 40px rgba(0,0,0,.5);
+    --shadow-pop:0 24px 70px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000;
+  --surface:#161618;
+  --surface-2:#232326;
+  --surface-3:#2f2f33;
+  --line:rgba(255,255,255,.10);
+  --line-strong:rgba(255,255,255,.20);
+  --ink:#f5f5f7;
+  --ink-2:#a1a1a6;
+  --ink-3:#78787d;
+  --accent:#0a84ff;
+  --accent-soft:rgba(10,132,255,.18);
+  --ok:#30d158; --ok-soft:rgba(48,209,88,.16);
+  --warn:#ff9f0a; --warn-soft:rgba(255,159,10,.16);
+  --hot:#ff453a;  --hot-soft:rgba(255,69,58,.18);
+  --dead:#78787d; --dead-soft:rgba(120,120,125,.18);
+  --nav:rgba(10,10,11,.72);
+  --shadow-1:0 1px 2px rgba(0,0,0,.6), 0 4px 16px rgba(0,0,0,.4);
+  --shadow-2:0 2px 6px rgba(0,0,0,.6), 0 14px 40px rgba(0,0,0,.5);
+  --shadow-pop:0 24px 70px rgba(0,0,0,.75);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",
+    "Segoe UI Variable Text","Segoe UI",Inter,system-ui,sans-serif;
+  font-size:15px; line-height:1.47;
+  letter-spacing:-.011em;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.022em;line-height:1.2}
+button,input,select{font:inherit;color:inherit;letter-spacing:inherit}
+button{-webkit-tap-highlight-color:transparent}
+a{color:var(--accent);text-decoration:none}
+::selection{background:var(--accent-soft)}
+
+@media (prefers-reduced-motion:no-preference){
+  .anim-in{animation:riseIn .55s var(--ease) both}
+  @keyframes riseIn{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:none}}
+}
+
+.wrap{max-width:1240px;margin:0 auto;padding-inline:22px}
+@media (max-width:560px){ .wrap{padding-inline:16px} }
+/* Fullscreen and large monitors: let the content use the extra width
+   instead of stranding it in the side gutters. */
+@media (min-width:1500px){ .wrap{max-width:1560px} }
+@media (min-width:2000px){ .wrap{max-width:1900px} }
+
+/* ============================================================
+   Nav
+   ============================================================ */
+header.nav{
+  position:sticky; top:0; z-index:50;
+  background:var(--nav);
+  -webkit-backdrop-filter:saturate(180%) blur(22px);
+  backdrop-filter:saturate(180%) blur(22px);
+  border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top);
+}
+.nav .wrap{display:flex;align-items:center;gap:14px;height:56px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.brand svg{flex:none;display:block}
+.brand h1{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand .sub{font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.004em}
+.nav .spacer{flex:1}
+.nav .acts{display:flex;gap:8px;align-items:center}
+
+.nbtn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:1px solid var(--line-strong);
+  color:var(--ink); border-radius:999px;
+  padding:7px 14px; font-size:13px; font-weight:500; cursor:pointer;
+  transition:background .25s var(--ease-soft), border-color .25s var(--ease-soft),
+             transform .18s var(--ease), color .25s var(--ease-soft);
+}
+.nbtn:hover{background:var(--surface-2)}
+.nbtn:active{transform:scale(.96)}
+.nbtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.nbtn .ic{font-size:13px;line-height:1}
+@media (max-width:720px){ .nbtn .tx{display:none} .nbtn{padding:8px 11px} }
+
+/* ============================================================
+   Controls
+   ============================================================ */
+.card-surface{
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-1);
+}
+.controls{margin-top:22px;padding:20px}
+.ctl-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label{
+  font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.field input,.field select{
+  background:var(--surface-2); border:1px solid transparent; border-radius:var(--r-sm);
+  padding:9px 11px; width:100%; min-width:0;
+  transition:background .2s var(--ease-soft), border-color .2s var(--ease-soft),
+             box-shadow .2s var(--ease-soft);
+  appearance:none;
+}
+.field select{
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+  background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+  padding-right:30px;
+}
+.field input:hover,.field select:hover{background:var(--surface-3)}
+.field input:focus,.field select:focus{
+  outline:none;background:var(--surface);
+  border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-soft);
+}
+.w-zip{flex:0 1 104px} .w-sm{flex:0 1 150px} .w-md{flex:0 1 178px}
+
+.btn{
+  background:var(--accent); color:var(--accent-ink); border:1px solid var(--accent);
+  border-radius:999px; padding:10px 22px; font-size:14px; font-weight:550;
+  cursor:pointer; white-space:nowrap;
+  transition:transform .18s var(--ease), opacity .2s var(--ease-soft), box-shadow .25s var(--ease);
+  box-shadow:0 1px 3px rgba(0,0,0,.12);
+}
+.btn:hover{box-shadow:0 4px 14px var(--accent-soft)}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none}
+
+/* segmented level control */
+.seg-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.seg-label{font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3)}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:11px;padding:3px;gap:2px}
+.seg button{
+  background:transparent;border:0;border-radius:8px;
+  padding:6px 13px;font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;
+  transition:background .25s var(--ease), color .2s var(--ease-soft), transform .16s var(--ease);
+}
+.seg button:hover{color:var(--ink)}
+.seg button:active{transform:scale(.94)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-1);font-weight:560}
+:root[data-theme="dark"] .seg button[aria-pressed="true"],
+:root:not([data-theme="light"]) .seg button[aria-pressed="true"]{background:var(--surface-3)}
+
+.toggle{
+  background:var(--surface-2);border:1px solid transparent;color:var(--ink-2);
+  border-radius:999px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;
+  transition:background .25s var(--ease), color .2s var(--ease-soft),
+             border-color .25s var(--ease-soft), transform .16s var(--ease);
+}
+.toggle:hover{background:var(--surface-3);color:var(--ink)}
+.toggle:active{transform:scale(.96)}
+.toggle[aria-pressed="true"]{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:550}
+
+.statusline{
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--line);
+  display:flex;gap:9px;align-items:center;color:var(--ink-2);font-size:13px;
+}
+.pip{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none;
+  box-shadow:0 0 0 3px var(--ok-soft)}
+.spin{width:13px;height:13px;border:2px solid var(--line-strong);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .65s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:18px;margin:22px 0 56px}
+@media (max-width:620px){ .grid{grid-template-columns:1fr;gap:14px} }
+
+.tcard{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-1); padding:20px;
+  display:flex;flex-direction:column;gap:14px;
+  position:relative;overflow:hidden;
+  transition:transform .4s var(--ease), box-shadow .4s var(--ease), border-color .3s var(--ease-soft);
+}
+@media (hover:hover){
+  .tcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-2);border-color:var(--line-strong)}
+}
+.tcard::before{
+  content:"";position:absolute;inset:0 auto 0 0;width:3px;
+  background:var(--dead);opacity:.9;
+  transition:width .35s var(--ease);
+}
+.tcard.s-hot::before{background:var(--hot)}
+.tcard.s-warn::before{background:var(--warn)}
+.tcard.s-ok::before{background:var(--ok)}
+.tcard:hover::before{width:5px}
+.tcard.s-dead{opacity:.6}
+
+.thead{display:flex;gap:12px;align-items:flex-start}
+.thead h3{font-size:16px;flex:1;min-width:0;letter-spacing:-.018em;line-height:1.3}
+.star{
+  background:none;border:0;cursor:pointer;font-size:18px;line-height:1;padding:2px;
+  color:var(--ink-3);flex:none;border-radius:8px;
+  transition:color .25s var(--ease-soft), transform .3s var(--ease);
+}
+.star:hover{color:var(--warn);transform:scale(1.18)}
+.star:active{transform:scale(.88)}
+.star[aria-pressed="true"]{color:#ff9f0a}
+@media (prefers-reduced-motion:no-preference){
+  .star.pop{animation:pop .45s var(--ease)}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.42) rotate(10deg)}100%{transform:scale(1)}}
+}
+
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{
+  font-size:11.5px;font-weight:550;border-radius:7px;padding:3.5px 9px;
+  background:var(--surface-2);color:var(--ink-2);letter-spacing:-.003em;
+}
+.tag.lv{background:var(--ink);color:var(--surface)}
+.tag.st-hot{background:var(--hot-soft);color:var(--hot)}
+.tag.st-warn{background:var(--warn-soft);color:var(--warn)}
+.tag.st-ok{background:var(--ok-soft);color:var(--ok)}
+.tag.st-dead{background:var(--dead-soft);color:var(--dead)}
+
+.facts{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:13.5px;margin:0}
+.facts dt{color:var(--ink-3);font-weight:500}
+.facts dd{margin:0;color:var(--ink);font-weight:450}
+.dl-hot{color:var(--hot);font-weight:600}
+.dl-warn{color:var(--warn);font-weight:600}
+.dl-dead{color:var(--dead)}
+
+.tfoot{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.act{
+  background:var(--surface-2);border:1px solid transparent;border-radius:999px;
+  padding:8px 15px;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink);
+  display:inline-flex;align-items:center;gap:6px;
+  transition:background .25s var(--ease), transform .16s var(--ease), color .2s var(--ease-soft);
+}
+.act:hover{background:var(--surface-3)}
+.act:active{transform:scale(.95)}
+.act.primary{background:var(--accent);color:var(--accent-ink)}
+.act.primary:hover{opacity:.9;background:var(--accent)}
+.act svg{flex:none}
+
+.empty{text-align:center;padding:72px 24px}
+.empty h3{font-size:19px;margin-bottom:10px}
+.empty p{color:var(--ink-2);max-width:460px;margin:0 auto;font-size:14px}
+
+/* ============================================================
+   Modal
+   ============================================================ */
+.scrim{
+  position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;
+  background:rgba(0,0,0,.4);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  animation:fadeIn .3s var(--ease-soft) both;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.sheet{
+  background:var(--surface);border:1px solid var(--line);border-radius:26px;
+  box-shadow:var(--shadow-pop);max-width:460px;width:100%;padding:28px;
+  max-height:88vh;overflow:auto;
+  animation:sheetIn .5s var(--ease) both;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+.sheet h2{font-size:22px;margin-bottom:7px;letter-spacing:-.025em}
+.sheet .lede{color:var(--ink-2);font-size:14px;margin:0 0 22px}
+.sheet .field{margin-bottom:15px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media (max-width:480px){ .row2{grid-template-columns:1fr} }
+.hint{
+  font-size:12.5px;color:var(--ink-2);background:var(--surface-2);
+  border-radius:12px;padding:12px 14px;margin-top:6px;line-height:1.5;
+}
+.hint.bad{background:var(--hot-soft);color:var(--hot)}
+.sheet-foot{display:flex;gap:9px;margin-top:24px;justify-content:flex-end}
+.btn-plain{
+  background:var(--surface-2);border:0;border-radius:999px;padding:10px 20px;
+  font-size:14px;font-weight:500;cursor:pointer;color:var(--ink);
+  transition:background .25s var(--ease), transform .16s var(--ease);
+}
+.btn-plain:hover{background:var(--surface-3)}
+.btn-plain:active{transform:scale(.96)}
+details.adv{margin-top:6px;border-top:1px solid var(--line);padding-top:14px}
+details.adv summary{
+  cursor:pointer;font-size:13px;font-weight:550;color:var(--ink-2);
+  list-style:none;display:flex;align-items:center;gap:6px;
+}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary::before{content:"›";transition:transform .3s var(--ease);display:inline-block;font-size:16px}
+details.adv[open] summary::before{transform:rotate(90deg)}
+details.adv .body{padding-top:14px}
+
+/* ============================================================
+   Toasts
+   ============================================================ */
+.toasts{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+  z-index:120;display:flex;flex-direction:column;gap:9px;align-items:center;
+  pointer-events:none;width:calc(100% - 32px);max-width:420px;
+}
+.toast{
+  background:var(--ink);color:var(--bg);
+  border-radius:15px;padding:12px 18px;font-size:13.5px;font-weight:500;
+  box-shadow:var(--shadow-pop);pointer-events:auto;
+  display:flex;align-items:center;gap:10px;max-width:100%;
+  animation:toastIn .5s var(--ease) both;
+}
+.toast.out{animation:toastOut .35s var(--ease-soft) both}
+@keyframes toastIn{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(12px) scale(.96)}}
+.toast .em{font-size:15px;flex:none}
+
+footer.foot{
+  color:var(--ink-3);font-size:12px;text-align:center;line-height:1.8;
+  padding:0 22px 48px;
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="8"/>
+        <path d="M18 20a58 58 0 0 1 0 60M82 20a58 58 0 0 0 0 60" stroke="currentColor" stroke-width="8" fill="none"/>
+      </svg>
+      <div style="min-width:0">
+        <h1>Tournaments</h1>
+        <div class="sub" id="whoami">—</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="acts">
+      <button class="nbtn" id="btnNotify" aria-pressed="false"><span class="ic">◎</span><span class="tx">Alerts</span></button>
+      <button class="nbtn" id="btnWatch" aria-pressed="false"><span class="ic">★</span><span class="tx">Saved</span></button>
+      <button class="nbtn" id="btnSettings"><span class="ic">⚙</span><span class="tx">Settings</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card-surface controls anim-in">
+    <div class="ctl-row">
+      <div class="field w-zip"><label for="fZip">ZIP</label><input id="fZip" inputmode="numeric" maxlength="5" placeholder="07928"></div>
+      <div class="field w-sm"><label for="fRadius">Max drive</label>
+        <select id="fRadius">
+          <option value="25">~30 min · 25 mi</option>
+          <option value="35">~45 min · 35 mi</option>
+          <option value="45" selected>~1 hour · 45 mi</option>
+          <option value="70">~1.5 hours · 70 mi</option>
+        </select>
+      </div>
+      <div class="field w-sm"><label for="fAge">Division</label><select id="fAge"></select></div>
+      <div class="field w-sm"><label for="fGender">Gender</label>
+        <select id="fGender"><option value="">Any</option><option value="boys">Boys</option><option value="girls">Girls</option></select>
+      </div>
+      <div class="field w-sm"><label for="fMonths">Ahead</label>
+        <select id="fMonths">
+          <option value="1">1 month</option><option value="3" selected>3 months</option>
+          <option value="6">6 months</option><option value="12">12 months</option>
+        </select>
+      </div>
+      <div class="field w-md"><label for="fSort">Sort</label>
+        <select id="fSort">
+          <option value="deadline">Deadline</option>
+          <option value="start">Tournament date</option>
+          <option value="distance">Distance</option>
+          <option value="price">Entry fee</option>
+        </select>
+      </div>
+      <button class="btn" id="btnSearch">Refresh</button>
+    </div>
+
+    <div class="seg-row">
+      <span class="seg-label">Level</span>
+      <div class="seg" id="lvlSeg">
+        <button data-lvl="1" aria-pressed="false">1</button>
+        <button data-lvl="2" aria-pressed="false">2</button>
+        <button data-lvl="3" aria-pressed="false">3</button>
+        <button data-lvl="4" aria-pressed="false">4</button>
+        <button data-lvl="5" aria-pressed="false">5</button>
+        <button data-lvl="6" aria-pressed="false">6</button>
+        <button data-lvl="7" aria-pressed="false">7</button>
+        <button data-lvl="other" aria-pressed="false">Other</button>
+      </div>
+      <span style="flex:1"></span>
+      <button class="toggle" id="chipOpen" aria-pressed="true">Open for entry</button>
+      <button class="toggle" id="chipSingles" aria-pressed="false">Singles only</button>
+    </div>
+
+    <div class="statusline" id="status"><span class="pip"></span><span>Ready</span></div>
+  </section>
+
+  <div class="grid" id="grid"></div>
+  <div id="emptyBox"></div>
+</main>
+
+<footer class="foot">
+  Public USTA tournament data · confirm details on the USTA page before paying.<br>
+  Live entry counts aren't in the public feed — use <strong>Who's in</strong> on a tournament.
+</footer>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Junior Tournament Tracker
+   Single file. Runs in a browser or inside the desktop app.
+   Data: public USTA "unified-search-api" (CORS-open, no login).
+   ============================================================ */
+
+const API  = "https://prd-usta-kube.clubspark.pro/unified-search-api/api/Search/tournaments/Query?indexSchema=tournament";
+const SITE = "https://playtennis.usta.com";
+const GEO  = z => `https://api.zippopotam.us/us/${z}`;
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+
+/* Running inside the WebView2 desktop shell? */
+const HOST = (typeof window !== "undefined" && window.chrome && window.chrome.webview) ? window.chrome.webview : null;
+
+const AGE_DIVS = [
+  {code:"U8",  label:"8 & under",  max:8},
+  {code:"U10", label:"10 & under", max:10},
+  {code:"U12", label:"12 & under", max:12},
+  {code:"U14", label:"14 & under", max:14},
+  {code:"U16", label:"16 & under", max:16},
+  {code:"U18", label:"18 & under", max:18},
+];
+
+/* ---------------- state ---------------- */
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} },
+};
+const defaults = {
+  zip:"", birthYear:null, gender:"", radius:45, months:3,
+  ageDiv:"auto", levels:[], onlyOpen:true, singlesOnly:false, sort:"deadline",
+  lat:null, lon:null, place:"", notify:false, theme:"auto", gcalClientId:"",
+};
+/* The desktop shell keeps a copy of everything below in a file beside the app,
+   and hands it back here as window.__restored before the page runs. That is what
+   survives replacing the exe, or the browser profile being reset — localStorage
+   alone would not. Local data always wins when it exists, since it is newer. */
+const RESTORED = (window.__restored && typeof window.__restored === "object") ? window.__restored : null;
+function loadPart(key, fallback){
+  const local = LS.get(key, null);
+  if(local != null) return local;
+  if(RESTORED && RESTORED[key] != null){
+    LS.set(key, RESTORED[key]);          // adopt it, so the page owns it from now on
+    return RESTORED[key];
+  }
+  return fallback;
+}
+
+let S     = Object.assign({}, defaults, loadPart("jtt.settings", {}));
+let watch = new Set(loadPart("jtt.watch", []));
+let sent  = loadPart("jtt.sent", {});
+let ALL = [], viewWatchOnly = false;
+
+/* Mirror the durable bits out to the shell. The tournament cache is left out
+   on purpose: it is large and rebuilds itself on the next refresh. */
+function persist(){
+  if(!HOST) return;
+  try{
+    HOST.postMessage(JSON.stringify({type:"persist", data:{
+      "jtt.settings":S, "jtt.watch":[...watch], "jtt.sent":sent,
+    }}));
+  }catch(e){}
+}
+const saveS = () => { LS.set("jtt.settings", S); persist(); };
+const saveW = () => { LS.set("jtt.watch", [...watch]); persist(); };
+const saveN = () => { LS.set("jtt.sent", sent); persist(); };
+
+/* ---------------- helpers ---------------- */
+const $  = s => document.querySelector(s);
+const el = (t,c,x) => { const n=document.createElement(t); if(c) n.className=c; if(x!=null) n.textContent=x; return n; };
+const DAY = 86400000;
+
+function currentAge(){ return S.birthYear ? new Date().getFullYear() - S.birthYear : null; }
+function autoDiv(){
+  const a = currentAge();
+  if(a == null) return "U12";
+  const hit = AGE_DIVS.find(d => a <= d.max);
+  return hit ? hit.code : "U18";
+}
+function activeDiv(){ return S.ageDiv === "auto" ? autoDiv() : S.ageDiv; }
+function divWords(code){ return (AGE_DIVS.find(d=>d.code===code)||{label:code}).label; }
+
+const money = c => c==null ? null : "$" + (c/100).toFixed(2).replace(/\.00$/,"");
+function feeLabel(list){
+  const v=[...new Set(list.filter(x=>x!=null))].sort((a,b)=>a-b);
+  if(!v.length) return "Not listed";
+  return v.length===1 ? money(v[0]) : `${money(v[0])} – ${money(v[v.length-1])}`;
+}
+const fmtDate = (iso,o) => iso ? new Date(iso).toLocaleDateString(undefined,o||{month:"short",day:"numeric",year:"numeric"}) : "—";
+function fmtRange(a,b){
+  if(!a) return "—";
+  const d1=new Date(a), d2=b?new Date(b):null, o={month:"short",day:"numeric"};
+  if(!d2 || d1.toDateString()===d2.toDateString()) return d1.toLocaleDateString(undefined,{...o,year:"numeric"});
+  if(d1.getMonth()===d2.getMonth() && d1.getFullYear()===d2.getFullYear())
+    return `${d1.toLocaleDateString(undefined,o)}–${d2.getDate()}, ${d2.getFullYear()}`;
+  return `${d1.toLocaleDateString(undefined,o)} – ${d2.toLocaleDateString(undefined,{...o,year:"numeric"})}`;
+}
+function countdown(ms){
+  if(ms==null) return "";
+  if(ms<=0) return "closed";
+  const d=Math.floor(ms/DAY), h=Math.floor((ms%DAY)/3600000);
+  if(d>=2) return `${d} days left`;
+  if(d===1) return `1 day, ${h}h left`;
+  if(h>=1)  return `${h} hours left`;
+  return "closing within the hour";
+}
+function levelOf(name){
+  if(!name) return {n:"other",label:"Unsanctioned"};
+  const m=/level\s*(\d)/i.exec(name);
+  return m ? {n:m[1],label:name} : {n:"other",label:name};
+}
+/* "L6" / "L1" — or a short word for unsanctioned events */
+function levelTag(t){ return t.level==="other" ? "L0" : "L"+t.level; }
+
+/* ---------------- toasts ---------------- */
+function toast(msg, emoji, ms){
+  const box=$("#toasts");
+  const n=el("div","toast");
+  if(emoji) n.appendChild(el("span","em",emoji));
+  n.appendChild(el("span",null,msg));
+  box.appendChild(n);
+  setTimeout(()=>{ n.classList.add("out"); setTimeout(()=>n.remove(),380); }, ms||3600);
+}
+
+function setStatus(text,mode){
+  const b=$("#status"); b.innerHTML="";
+  b.appendChild(mode==="load" ? el("span","spin") : el("span","pip"));
+  b.appendChild(el("span",null,text));
+}
+
+/* ---------------- geocode ---------------- */
+async function geocode(zip){
+  const r=await fetch(GEO(zip));
+  if(!r.ok) throw new Error("ZIP not found");
+  const j=await r.json(), p=j.places&&j.places[0];
+  if(!p) throw new Error("ZIP not found");
+  return {lat:+p.latitude, lon:+p.longitude, place:`${p["place name"]}, ${p["state abbreviation"]}`};
+}
+
+/* ---------------- fetch USTA ---------------- */
+function buildBody(lat,lon,miles,months,from,size){
+  const min=new Date(); min.setHours(0,0,0,0);
+  const max=new Date(min); max.setMonth(max.getMonth()+months);
+  return {
+    options:{size,from,sortKey:"date",latitude:lat,longitude:lon},
+    filters:[
+      {key:"publish-target",items:[{value:1}]},
+      {key:"level-category",items:[{value:"junior"}],operator:"Or"},
+      {key:"date-range",items:[{minDate:min.toISOString(),maxDate:max.toISOString()}],operator:"Or"},
+      {key:"distance",items:[{value:miles}],operator:"Or"},
+    ],
+  };
+}
+async function fetchAll(lat,lon,miles,months){
+  const PAGE=100,out=[]; let from=0,total=Infinity,guard=0;
+  while(from<total && guard++<25){
+    const res=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(buildBody(lat,lon,miles,months,from,PAGE))});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j=await res.json();
+    total=j.total??0;
+    const rows=j.searchResults||[];
+    out.push(...rows);
+    if(!rows.length) break;
+    from+=PAGE;
+    setStatus(`Loading ${Math.min(out.length,total)} of ${total}…`,"load");
+  }
+  return out;
+}
+
+function normalise(rows){
+  return rows.map(r=>{
+    const i=r.item||{}, rr=i.registrationRestrictions||{};
+    const evs=(i.events||[]).filter(e=>e&&e.isPublished!==false);
+    const lvl=levelOf(i.level&&i.level.name);
+    const loc=i.primaryLocation||{}, org=i.organization||{};
+    const url = org.urlSegment&&i.url ? `${SITE}/${org.urlSegment}${i.url}` : `${SITE}${i.url||""}`;
+    return {
+      id:i.id, name:(i.name||"Untitled tournament").trim(), code:i.identificationCode||"",
+      venue:org.name||loc.town||"",
+      town:[loc.town,loc.county].filter(Boolean).join(", "),
+      address:[loc.address1,loc.town,loc.county,loc.postcode].filter(Boolean).join(", "),
+      miles:r.distance!=null ? +r.distance.toFixed(1) : null,
+      level:lvl.n, levelLabel:lvl.label,
+      start:i.startDateTime, end:i.endDateTime,
+      deadline:rr.entriesCloseDateTime||null,
+      cancelled:!!i.isCancelled,
+      events:evs.map(e=>({
+        div:e.division?.ageCategory?.todsCode||"OPEN",
+        gender:e.division?.gender||"", type:e.division?.eventType||"",
+        fee:e.pricing?.entryFee?.amount??null,
+      })),
+      url, playersUrl:url.replace("/Tournaments/Overview/","/Tournaments/players/"),
+    };
+  }).filter(t=>t.id);
+}
+
+/* ---------------- filter + sort ---------------- */
+function matchingEvents(t){
+  const div=activeDiv();
+  return t.events.filter(e =>
+    e.div===div &&
+    (!S.gender || !e.gender || e.gender===S.gender) &&
+    (!S.singlesOnly || e.type==="singles"));
+}
+function applyFilters(){
+  const now=Date.now();
+  let list=ALL.filter(t=>{
+    if(t.cancelled) return false;
+    if(!matchingEvents(t).length) return false;
+    if(S.levels.length && !S.levels.includes(t.level)) return false;
+    if(S.onlyOpen){
+      if(!t.deadline) return false;
+      if(new Date(t.deadline).getTime()<=now) return false;
+    }
+    return true;
+  });
+  if(viewWatchOnly) list=list.filter(t=>watch.has(t.id));
+  const key={
+    deadline:t=>t.deadline?new Date(t.deadline).getTime():Infinity,
+    start:t=>t.start?new Date(t.start).getTime():Infinity,
+    distance:t=>t.miles??Infinity,
+    price:t=>{const f=matchingEvents(t).map(e=>e.fee).filter(x=>x!=null);return f.length?Math.min(...f):Infinity;},
+  }[S.sort];
+  return list.sort((a,b)=>key(a)-key(b));
+}
+function statusOf(t){
+  if(!t.deadline) return {cls:"dead",label:"No deadline",ms:null};
+  const ms=new Date(t.deadline).getTime()-Date.now();
+  if(ms<=0)     return {cls:"dead",label:"Closed",ms};
+  if(ms<=2*DAY) return {cls:"hot", label:"Closing now",ms};
+  if(ms<=7*DAY) return {cls:"warn",label:"Closing soon",ms};
+  return {cls:"ok",label:"Open",ms};
+}
+
+/* ============================================================
+   Google Calendar
+   ============================================================
+   Title  : "L6 (Tournament Name)"
+   Details: full date + time of the tournament, deadline, fee, link.
+
+   Two paths:
+   • Connected  — inserts straight into the user's primary calendar
+                  via the Calendar API (needs a Google OAuth client ID).
+   • Otherwise  — opens Google Calendar with every field pre-filled;
+                  one tap on "Save" and it's in.
+   ============================================================ */
+
+function gcalTitle(t){ return `${levelTag(t)} (${t.name})`; }
+
+function tournamentWhen(t){
+  if(!t.start) return "Dates to be confirmed";
+  const opts={weekday:"long",month:"long",day:"numeric",year:"numeric"};
+  const tOpts={hour:"numeric",minute:"2-digit"};
+  const d1=new Date(t.start), d2=t.end?new Date(t.end):null;
+  const startTxt=`${d1.toLocaleDateString(undefined,opts)} at ${d1.toLocaleTimeString(undefined,tOpts)}`;
+  if(!d2) return `Starts ${startTxt}`;
+  const endTxt=`${d2.toLocaleDateString(undefined,opts)} at ${d2.toLocaleTimeString(undefined,tOpts)}`;
+  return `Starts: ${startTxt}\nEnds:   ${endTxt}`;
+}
+
+function gcalDetails(t){
+  const evs=matchingEvents(t);
+  return [
+    tournamentWhen(t),
+    "",
+    `Level: ${t.level==="other" ? t.levelLabel : "USTA Level "+t.level}`,
+    `Division: ${divWords(activeDiv())}`,
+    `Entry fee: ${feeLabel(evs.map(e=>e.fee))}`,
+    t.deadline ? `Entries close: ${new Date(t.deadline).toLocaleString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}` : null,
+    t.miles!=null ? `Distance: ${t.miles} mi from home` : null,
+    t.code ? `Tournament ID: ${t.code}` : null,
+    "",
+    t.url,
+  ].filter(x=>x!=null).join("\n");
+}
+
+const gDay = d => { const x=new Date(d); return x.getFullYear()+String(x.getMonth()+1).padStart(2,"0")+String(x.getDate()).padStart(2,"0"); };
+
+/* Tournaments are multi-day, so an all-day span reads best on a calendar.
+   The exact clock times live in the description.
+
+   Dates must be read in LOCAL time, not UTC: the feed ends a tournament at
+   23:59 local, which is the *following* day in UTC. Using UTC here stretched
+   every event a day past its real finish. */
+function gcalDates(t){
+  if(!t.start) return null;
+  const endEx=new Date(t.end||t.start);
+  endEx.setDate(endEx.getDate()+1);      // all-day ends are exclusive
+  return `${gDay(t.start)}/${gDay(endEx)}`;
+}
+
+function gcalTemplateUrl(t){
+  const p=new URLSearchParams({
+    action:"TEMPLATE",
+    text:gcalTitle(t),
+    details:gcalDetails(t),
+    location:t.address||t.venue||"",
+    trp:"false",
+  });
+  const d=gcalDates(t);
+  if(d) p.set("dates",d);
+  return "https://calendar.google.com/calendar/render?"+p.toString();
+}
+
+/* --- OAuth (only used when a client ID is configured) --- */
+let gToken=null, gTokenExp=0, gClient=null;
+
+function gcalConfigured(){ return !!(S.gcalClientId && S.gcalClientId.trim()); }
+
+function loadGis(){
+  return new Promise((res,rej)=>{
+    if(window.google && google.accounts && google.accounts.oauth2) return res();
+    const s=document.createElement("script");
+    s.src="https://accounts.google.com/gsi/client";
+    s.async=true; s.defer=true;
+    s.onload=()=>res(); s.onerror=()=>rej(new Error("Couldn't load Google sign-in"));
+    document.head.appendChild(s);
+  });
+}
+async function gcalToken(interactive){
+  if(gToken && Date.now()<gTokenExp-60000) return gToken;
+  await loadGis();
+  return new Promise((res,rej)=>{
+    gClient = google.accounts.oauth2.initTokenClient({
+      client_id:S.gcalClientId.trim(),
+      scope:GCAL_SCOPE,
+      callback:(r)=>{
+        if(r && r.access_token){
+          gToken=r.access_token;
+          gTokenExp=Date.now()+(r.expires_in||3600)*1000;
+          res(gToken);
+        } else rej(new Error(r&&r.error ? r.error : "Sign-in cancelled"));
+      },
+      error_callback:(e)=>rej(new Error((e&&e.type)||"Sign-in failed")),
+    });
+    gClient.requestAccessToken({prompt: interactive ? "consent" : ""});
+  });
+}
+async function gcalInsert(t){
+  const token=await gcalToken(false);
+  const d=gcalDates(t);
+  if(!d) throw new Error("This tournament has no dates yet");
+  const [s,e]=d.split("/");
+  const iso = v => `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;
+  const body={
+    summary:gcalTitle(t),
+    description:gcalDetails(t),
+    location:t.address||t.venue||"",
+    start:{date:iso(s)},
+    end:{date:iso(e)},
+    source:{title:"USTA tournament page", url:t.url},
+    reminders:{useDefault:false, overrides:[{method:"popup",minutes:24*60}]},
+  };
+  const r=await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events",{
+    method:"POST",
+    headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify(body),
+  });
+  if(!r.ok){
+    const txt=await r.text().catch(()=> "");
+    throw new Error(`Calendar API ${r.status}${txt?": "+txt.slice(0,120):""}`);
+  }
+  return r.json();
+}
+
+async function addToCalendar(t, btn){
+  const label = btn ? btn.querySelector(".lb") : null;
+  const set = s => { if(label) label.textContent = s; };
+
+  if(gcalConfigured()){
+    set("Adding…");
+    try{
+      await gcalInsert(t);
+      set("Added ✓");
+      toast(`“${gcalTitle(t)}” added to your Google Calendar`, "📅");
+      setTimeout(()=>set("Add to calendar"), 2600);
+      return;
+    }catch(err){
+      set("Add to calendar");
+      toast("Couldn't add automatically — opening Google Calendar instead", "⚠️", 4200);
+    }
+  }
+  /* Pre-filled Google Calendar event; one tap on Save. */
+  window.open(gcalTemplateUrl(t), "_blank", "noopener");
+  if(!gcalConfigured()) toast("Check the details, then press Save in Google Calendar", "📅", 4200);
+}
+
+/* ============================================================
+   Notifications
+   ============================================================
+   Desktop app  -> native Windows toasts through the host shell.
+   Browser      -> Notification API, which needs a secure context
+                   (https:// or localhost). Opening the file directly
+                   from disk is NOT a secure context, and browsers
+                   auto-deny there — so we say so plainly.
+   ============================================================ */
+
+const THRESHOLDS=[
+  {days:7,tag:"7d",word:"closes in 7 days"},
+  {days:3,tag:"3d",word:"closes in 3 days"},
+  {days:1,tag:"1d",word:"closes tomorrow"},
+  {days:0,tag:"now",word:"closes today"},
+];
+
+function alertCapability(){
+  if(HOST) return {ok:true, mode:"host"};
+  if(!("Notification" in window)) return {ok:false, why:"This browser can't show notifications."};
+  if(!window.isSecureContext) return {ok:false, insecure:true,
+    why:"Browsers block notifications on pages opened straight from a file. Use the desktop app (Tournament Tracker.exe), or put the page on a web address."};
+  if(Notification.permission==="denied") return {ok:false,
+    why:"Notifications are blocked for this page. Allow them in your browser's site settings, then try again."};
+  return {ok:true, mode:"web", needsAsk:Notification.permission!=="granted"};
+}
+
+function fireNotification(title, body, url){
+  if(HOST){
+    HOST.postMessage(JSON.stringify({type:"notify", title, body, url}));
+    return;
+  }
+  const n=new Notification(title,{
+    body, tag:url||title, icon:"data:image/svg+xml,"+encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='44' fill='none' stroke='%230a84ff' stroke-width='8'/></svg>"),
+  });
+  if(url) n.onclick=()=>{ window.open(url,"_blank"); n.close(); };
+}
+
+function notifyCheck(){
+  if(!S.notify) return;
+  const cap=alertCapability();
+  if(!cap.ok) return;
+  if(cap.mode==="web" && Notification.permission!=="granted") return;
+
+  const now=Date.now();
+  const pool=ALL.filter(t=>watch.has(t.id)||matchingEvents(t).length);
+  let fired=0;
+
+  for(const t of pool){
+    if(!t.deadline) continue;
+    const ms=new Date(t.deadline).getTime()-now;
+    if(ms<=0) continue;
+    const watched=watch.has(t.id);
+    for(const th of THRESHOLDS){
+      if(ms>(th.days+1)*DAY) continue;
+      const key=`${t.id}:${th.tag}`;
+      if(sent[key]) break;
+      if(!watched && th.days>3) break;      /* unsaved: only 3d / 1d / today */
+      if(fired>=3) { saveN(); return; }     /* never dump a pile at once */
+      fireNotification(
+        `${watched?"★ ":""}Entry ${th.word}`,
+        `${t.name}\n${fmtRange(t.start,t.end)} · ${t.miles!=null?t.miles+" mi · ":""}${feeLabel(matchingEvents(t).map(e=>e.fee))}`,
+        t.url);
+      sent[key]=now; fired++;
+      break;
+    }
+  }
+  const cut=now-120*DAY;
+  Object.keys(sent).forEach(k=>{ if(sent[k]<cut) delete sent[k]; });
+  saveN();
+}
+
+async function toggleNotify(){
+  if(S.notify){
+    S.notify=false; saveS(); paintNotify();
+    toast("Deadline alerts turned off","◎");
+    return;
+  }
+  const cap=alertCapability();
+  if(!cap.ok){
+    toast(cap.why, "⚠️", 7000);
+    if(cap.insecure) setTimeout(()=>toast("The desktop app also alerts you while it sits in the system tray.","💡",6000), 900);
+    return;
+  }
+  if(cap.mode==="web" && cap.needsAsk){
+    let p;
+    try{ p=await Notification.requestPermission(); }catch(e){ p="denied"; }
+    if(p!=="granted"){
+      toast("Permission denied — allow notifications for this page in your browser settings.","⚠️",6500);
+      return;
+    }
+  }
+  S.notify=true; saveS(); paintNotify();
+  fireNotification("Deadline alerts are on","You'll hear from me 7, 3 and 1 days before entries close.");
+  toast("Deadline alerts are on","🔔");
+  notifyCheck();
+}
+function paintNotify(){
+  const b=$("#btnNotify");
+  b.setAttribute("aria-pressed",S.notify);
+  b.querySelector(".ic").textContent = S.notify ? "◉" : "◎";
+  b.title = S.notify ? "Deadline alerts on" : "Deadline alerts off";
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+function icon(path){
+  const s=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  s.setAttribute("width","13"); s.setAttribute("height","13");
+  s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none");
+  s.setAttribute("stroke","currentColor"); s.setAttribute("stroke-width","2");
+  s.setAttribute("stroke-linecap","round"); s.setAttribute("stroke-linejoin","round");
+  const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d",path); s.appendChild(p);
+  return s;
+}
+
+function card(t,idx){
+  const st=statusOf(t), evs=matchingEvents(t);
+  const c=el("div",`tcard s-${st.cls} anim-in`);
+  c.style.animationDelay = Math.min(idx,14)*26 + "ms";
+
+  const head=el("div","thead");
+  head.appendChild(el("h3",null,t.name));
+  const star=el("button","star",watch.has(t.id)?"★":"☆");
+  star.setAttribute("aria-pressed",watch.has(t.id));
+  star.title="Save this tournament";
+  star.onclick=()=>{
+    const adding=!watch.has(t.id);
+    adding ? watch.add(t.id) : watch.delete(t.id);
+    saveW();
+    star.textContent=adding?"★":"☆";
+    star.setAttribute("aria-pressed",adding);
+    star.classList.remove("pop"); void star.offsetWidth; star.classList.add("pop");
+    toast(adding?"Saved — you'll get earlier warnings for this one":"Removed from saved", adding?"★":"☆", 2600);
+    if(viewWatchOnly) setTimeout(render,320);
+  };
+  head.appendChild(star);
+  c.appendChild(head);
+
+  const tags=el("div","tags");
+  tags.appendChild(el("span","tag lv", t.level==="other" ? t.levelLabel : `Level ${t.level}`));
+  tags.appendChild(el("span",`tag st-${st.cls}`, st.label));
+  const g=[...new Set(evs.map(e=>e.gender).filter(Boolean))];
+  if(g.length) tags.appendChild(el("span","tag", g.map(x=>x[0].toUpperCase()+x.slice(1)).join(" & ")));
+  const ty=[...new Set(evs.map(e=>e.type).filter(Boolean))];
+  if(ty.length) tags.appendChild(el("span","tag", ty.join(" + ")));
+  c.appendChild(tags);
+
+  const dl=el("dl","facts");
+  const add=(k,v,cls)=>{ dl.appendChild(el("dt",null,k)); dl.appendChild(el("dd",cls||null,v)); };
+  add("Plays",fmtRange(t.start,t.end));
+  add("Deadline", t.deadline?`${fmtDate(t.deadline)} · ${countdown(st.ms)}`:"Not published",
+      st.cls==="ok"?null:`dl-${st.cls}`);
+  add("Entry fee",feeLabel(evs.map(e=>e.fee)));
+  add("Where",[t.venue,t.town].filter(Boolean).join(" · ")||"—");
+  if(t.miles!=null) add("Distance",`${t.miles} mi · about ${Math.round(t.miles/0.75)} min`);
+  c.appendChild(dl);
+
+  const f=el("div","tfoot");
+
+  const cal=el("button","act primary");
+  cal.appendChild(icon("M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"));
+  cal.appendChild(el("span","lb","Add to calendar"));
+  cal.onclick=()=>addToCalendar(t,cal);
+  f.appendChild(cal);
+
+  const go=el("a","act","Register");
+  go.href=t.url; go.target="_blank"; go.rel="noopener";
+  f.appendChild(go);
+
+  const pl=el("a","act","Who's in");
+  pl.href=t.playersUrl; pl.target="_blank"; pl.rel="noopener";
+  f.appendChild(pl);
+
+  c.appendChild(f);
+  return c;
+}
+
+function render(){
+  const list=applyFilters();
+  const grid=$("#grid"), box=$("#emptyBox");
+  grid.innerHTML=""; box.innerHTML="";
+
+  const div=activeDiv(), age=currentAge();
+  $("#whoami").textContent=[
+    S.place||(S.zip?`ZIP ${S.zip}`:"Set your location"),
+    divWords(div),
+    age?`age ${age}`:null,
+  ].filter(Boolean).join(" · ");
+
+  if(!list.length){
+    const e=el("div","card-surface empty anim-in");
+    e.appendChild(el("h3",null, ALL.length?"Nothing matches":"Nothing loaded yet"));
+    e.appendChild(el("p",null, ALL.length
+      ? `${ALL.length} junior tournaments are nearby, but none fit ${divWords(div)} with these filters. Try more levels, turn off “Open for entry”, or look further ahead.`
+      : "Add your ZIP code and press Refresh."));
+    box.appendChild(e);
+  } else {
+    const frag=document.createDocumentFragment();
+    list.forEach((t,i)=>frag.appendChild(card(t,i)));
+    grid.appendChild(frag);
+  }
+
+  const closing=list.filter(t=>{const s=statusOf(t);return s.ms!=null&&s.ms>0&&s.ms<=7*DAY;}).length;
+  setStatus(`${list.length} tournament${list.length===1?"":"s"} · ${divWords(div)}`
+    + (closing?` · ${closing} closing within 7 days`:"")
+    + (viewWatchOnly?" · saved only":""));
+}
+
+/* ============================================================
+   Settings
+   ============================================================ */
+function openSettings(force){
+  const scrim=el("div","scrim"), m=el("div","sheet");
+  const yr=new Date().getFullYear();
+
+  m.innerHTML=`
+    <h2>${force?"Welcome":"Settings"}</h2>
+    <p class="lede">${force
+      ? "Two details and I'll start tracking junior tournaments near you."
+      : "Your division updates itself each year from your birth year."}</p>
+
+    <div class="field">
+      <label for="sZip">Home ZIP code</label>
+      <input id="sZip" inputmode="numeric" maxlength="5" placeholder="07928" value="${S.zip||""}">
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label for="sYear">Birth year</label>
+        <input id="sYear" inputmode="numeric" maxlength="4" placeholder="${yr-12}" value="${S.birthYear||""}">
+      </div>
+      <div class="field">
+        <label for="sGender">Plays in</label>
+        <select id="sGender">
+          <option value="">Boys or girls</option>
+          <option value="boys"${S.gender==="boys"?" selected":""}>Boys' events</option>
+          <option value="girls"${S.gender==="girls"?" selected":""}>Girls' events</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="sTheme">Appearance</label>
+      <select id="sTheme">
+        <option value="auto"${S.theme==="auto"?" selected":""}>Match system</option>
+        <option value="light"${S.theme==="light"?" selected":""}>Light</option>
+        <option value="dark"${S.theme==="dark"?" selected":""}>Dark</option>
+      </select>
+    </div>
+
+    <div class="hint" id="sNote">Birth year drives the age division — on Jan 1 it moves you up on its own.</div>
+
+    <details class="adv">
+      <summary>Google Calendar — one-tap vs fully automatic</summary>
+      <div class="body">
+        <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">
+          Right now “Add to calendar” opens Google Calendar with everything filled in and you press Save.
+          To skip that last tap, paste a Google OAuth client ID — the README has the five-minute walkthrough.
+        </p>
+        <div class="field">
+          <label for="sGcal">Google OAuth client ID (optional)</label>
+          <input id="sGcal" placeholder="1234-abc.apps.googleusercontent.com" value="${S.gcalClientId||""}">
+        </div>
+        <div class="hint">Only works on a real web address (https:// or localhost), because Google won't
+        authorise a page opened from disk.</div>
+      </div>
+    </details>
+
+    <div class="sheet-foot">
+      ${force?"":'<button class="btn-plain" id="sCancel">Cancel</button>'}
+      <button class="btn" id="sSave">${force?"Start":"Save"}</button>
+    </div>`;
+
+  scrim.appendChild(m); document.body.appendChild(scrim);
+  m.querySelector("#sZip").focus();
+
+  const close=()=>{ scrim.style.animation="fadeIn .25s var(--ease-soft) reverse both"; setTimeout(()=>scrim.remove(),230); };
+  if(!force){
+    m.querySelector("#sCancel").onclick=close;
+    scrim.onclick=e=>{ if(e.target===scrim) close(); };
+    document.addEventListener("keydown",function esc(ev){
+      if(ev.key==="Escape"){ close(); document.removeEventListener("keydown",esc); }
+    });
+  }
+
+  m.querySelector("#sSave").onclick=async()=>{
+    const zip=m.querySelector("#sZip").value.trim();
+    const y=parseInt(m.querySelector("#sYear").value.trim(),10);
+    const note=m.querySelector("#sNote");
+    const bad=t=>{ note.textContent=t; note.classList.add("bad"); };
+
+    if(!/^\d{5}$/.test(zip)) return bad("Please enter a 5-digit US ZIP code.");
+    if(y && (y<yr-25||y>yr)) return bad("That birth year doesn't look right.");
+
+    S.gender=m.querySelector("#sGender").value;
+    S.theme=m.querySelector("#sTheme").value;
+    S.birthYear=y||null;
+    S.gcalClientId=m.querySelector("#sGcal").value.trim();
+    applyTheme();
+
+    if(zip!==S.zip||S.lat==null){
+      note.classList.remove("bad"); note.textContent="Looking up that ZIP…";
+      try{
+        const g=await geocode(zip);
+        S.zip=zip; S.lat=g.lat; S.lon=g.lon; S.place=g.place;
+      }catch(err){ return bad("Couldn't find that ZIP code."); }
+    }
+    saveS(); close(); syncControls(); search();
+  };
+}
+
+function applyTheme(){
+  if(S.theme==="auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme",S.theme);
+  const dark = S.theme==="dark" || (S.theme==="auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", dark ? "#000000" : "#f5f5f7");
+}
+
+/* ============================================================
+   Wiring
+   ============================================================ */
+function buildAgeSelect(){
+  const sel=$("#fAge"); sel.innerHTML="";
+  const a=el("option",null,`Auto · ${divWords(autoDiv())}`); a.value="auto"; sel.appendChild(a);
+  AGE_DIVS.forEach(d=>{ const o=el("option",null,d.label); o.value=d.code; sel.appendChild(o); });
+  sel.value=S.ageDiv;
+}
+function syncControls(){
+  $("#fZip").value=S.zip||"";
+  $("#fRadius").value=String(S.radius);
+  $("#fGender").value=S.gender;
+  $("#fMonths").value=String(S.months);
+  $("#fSort").value=S.sort;
+  buildAgeSelect();
+  document.querySelectorAll("#lvlSeg button").forEach(b=>
+    b.setAttribute("aria-pressed",S.levels.includes(b.dataset.lvl)));
+  $("#chipOpen").setAttribute("aria-pressed",S.onlyOpen);
+  $("#chipSingles").setAttribute("aria-pressed",S.singlesOnly);
+  paintNotify();
+}
+
+async function search(){
+  if(!S.zip||S.lat==null){ openSettings(true); return; }
+  $("#btnSearch").disabled=true;
+  setStatus("Contacting USTA…","load");
+  try{
+    ALL=normalise(await fetchAll(S.lat,S.lon,S.radius,S.months));
+    LS.set("jtt.cache",{at:Date.now(),zip:S.zip,radius:S.radius,months:S.months,data:ALL});
+    render(); notifyCheck();
+  }catch(err){
+    setStatus(`Couldn't reach USTA (${err.message}). Check your connection and press Refresh.`);
+    toast("Couldn't reach the USTA search","⚠️",5000);
+  }finally{ $("#btnSearch").disabled=false; }
+}
+
+function bind(){
+  $("#btnSearch").onclick=()=>{
+    const z=$("#fZip").value.trim();
+    S.radius=+$("#fRadius").value; S.months=+$("#fMonths").value;
+    if(/^\d{5}$/.test(z)&&z!==S.zip){
+      geocode(z).then(g=>{ S.zip=z;S.lat=g.lat;S.lon=g.lon;S.place=g.place;saveS();search(); })
+                .catch(()=>toast("Couldn't find that ZIP code","⚠️"));
+      return;
+    }
+    saveS(); search();
+  };
+  $("#fAge").onchange=e=>{ S.ageDiv=e.target.value; saveS(); render(); };
+  $("#fGender").onchange=e=>{ S.gender=e.target.value; saveS(); render(); };
+  $("#fSort").onchange=e=>{ S.sort=e.target.value; saveS(); render(); };
+  $("#fRadius").onchange=e=>{ S.radius=+e.target.value; saveS(); search(); };
+  $("#fMonths").onchange=e=>{ S.months=+e.target.value; saveS(); search(); };
+
+  document.querySelectorAll("#lvlSeg button").forEach(b=>b.onclick=()=>{
+    const v=b.dataset.lvl;
+    S.levels=S.levels.includes(v)?S.levels.filter(x=>x!==v):[...S.levels,v];
+    saveS(); syncControls(); render();
+  });
+  $("#chipOpen").onclick=()=>{ S.onlyOpen=!S.onlyOpen; saveS(); syncControls(); render(); };
+  $("#chipSingles").onclick=()=>{ S.singlesOnly=!S.singlesOnly; saveS(); syncControls(); render(); };
+
+  $("#btnNotify").onclick=toggleNotify;
+  $("#btnSettings").onclick=()=>openSettings(false);
+  $("#btnWatch").onclick=()=>{
+    viewWatchOnly=!viewWatchOnly;
+    $("#btnWatch").setAttribute("aria-pressed",viewWatchOnly);
+    render();
+  };
+
+  /* F11 toggles fullscreen. Inside the desktop app the shell owns the window,
+     so hand it over; in a browser the page asks for fullscreen itself. */
+  document.addEventListener("keydown", e => {
+    if(e.key!=="F11" || e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+    if(HOST){ try{ HOST.postMessage(JSON.stringify({type:"fullscreen"})); }catch(err){} return; }
+    if(document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(()=>{});
+  });
+
+  setInterval(notifyCheck,30*60*1000);
+  let lastFetch=Date.now();
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState!=="visible") return;
+    render();
+    if(Date.now()-lastFetch>6*3600*1000&&S.lat!=null){ lastFetch=Date.now(); search(); }
+    else notifyCheck();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change",applyTheme);
+
+  /* The desktop shell asks for a re-check when it wakes from the tray. */
+  if(HOST) HOST.addEventListener("message", ev => {
+    let d; try{ d = typeof ev.data==="string" ? JSON.parse(ev.data) : ev.data; }catch(e){ return; }
+    if(d && d.type==="recheck"){ notifyCheck(); }
+  });
+}
+
+/* ---------------- boot ---------------- */
+(function init(){
+  applyTheme(); bind(); syncControls();
+  const cache=LS.get("jtt.cache",null);
+  if(cache&&cache.zip===S.zip&&cache.radius===S.radius&&cache.months===S.months&&Array.isArray(cache.data)){
+    ALL=cache.data; render();
+    setStatus(`Saved results from ${new Date(cache.at).toLocaleString()} — refreshing…`,"load");
+  }
+  if(!S.zip||S.lat==null) openSettings(true); else search();
+})();
+</script>
+</body>
+</html>

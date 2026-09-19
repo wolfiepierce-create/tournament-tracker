@@ -1,0 +1,5 @@
+# Build output — the exe is 63 MB and GitHub Pages doesn't need it.
+# Ship it as a Release attachment instead of committing it.
+dist/
+desktop/bin/
+desktop/obj/
