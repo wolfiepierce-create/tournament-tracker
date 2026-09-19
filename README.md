@@ -1,7 +1,8 @@
 # Junior Tournament Tracker
 
-Finds USTA **junior** tournaments near you, shows the entry deadline, dates and fee,
-nags you before registration closes, and drops any tournament straight into Google Calendar.
+Finds **junior** tennis tournaments near you from **USTA** or **UTR**, shows the entry
+deadline, dates and fee, tells you when new ones are posted, nags you before registration
+closes, and drops any tournament straight into Google Calendar.
 
 Two ways to run it:
 
@@ -110,10 +111,43 @@ directly:
 
 ---
 
+## USTA or UTR
+
+The small **USTA ▾** pill beside the title switches the whole app between the two.
+Each keeps its own filters, so flipping back and forth never loses your setup.
+
+| | USTA | UTR |
+|---|---|---|
+| Rating filter | Level 1–7 (1 hardest) + *Other* | UTR 1–12 |
+| Age | Division 8U–18U, auto from birth year | **Juniors only** toggle |
+| Players already entered | Not published — **Who's in** opens the list | Shown on the card |
+| Calendar title | `L6 (Tournament Name)` | `UTR 1–5 (Tournament Name)` |
+
+A UTR button means that whole band — **5** is 5.00–5.99 — and an event matches when its
+allowed range overlaps it. Many UTR events are open to a very wide range like 1–16, which
+is why those appear under almost every band: they genuinely accept that player.
+
+**How "Juniors only" works, honestly.** UTR's public search has no age field. The app
+recognises junior events from what the director wrote in the event and division names —
+*Junior*, *12U*, *Boys 14s*, *red/orange/green ball*, *high school* and similar. Events
+open to "All Ages" count too, since juniors can enter them. A junior event with a name
+that gives no hint will be missed; turn the toggle off to see everything.
+
+## New tournament alerts
+
+With **Alerts** on, you're notified when a tournament is **added** to whichever source is
+selected — but only if it matches your filters. Up to three arrive individually; more than
+that becomes one summary. New ones also get a **New** tag for three days.
+
+The app checks every hour while it's open (the desktop app keeps checking from the tray).
+It remembers every tournament it has already seen, so the first run, widening your radius,
+or the calendar rolling forward never set off false "new" alerts — only tournaments that
+actually appear on the site do.
+
 ## Filters
 
-- **USTA level** 1–7 (1 hardest, 7 easiest) plus *Other* for Junior Circuit and unsanctioned
-- **Division** — 8U / 10U / 12U / 14U / 16U / 18U, or *Auto* from your birth year
+- **Rating** — USTA level or UTR band, per the source
+- **Division** (USTA) or **Juniors only** (UTR)
 - **Gender**, **singles only**, **max drive** (25–70 mi), **how far ahead** to look
 - **Open for entry** — on by default, hides anything you can no longer enter
 
@@ -124,20 +158,16 @@ Sort by deadline, tournament date, distance or entry fee. Tap **☆** to save a 
 
 ## Getting it on your phone
 
-Your phone can't reach a file on your PC, so `index.html` needs a web address first.
+It's live at **<https://wolfiepierce-create.github.io/tournament-tracker/>**.
 
-**GitHub Pages** (free, permanent; `git` is already on this machine) — create an empty
-GitHub repo, then:
+The site is deployed by the GitHub Action in `.github/workflows/pages.yml`, which runs on
+every push to `main` and every 3 hours (to refresh the UTR snapshot). To publish a change:
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git init && git add index.html README.md && git commit -m "Junior tournament tracker" && git branch -M main
+cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git add index.html && git commit -m "Update tracker" && git push
 ```
 
-Push it, then **Settings → Pages** → source `main` / root.
-
-**Netlify Drop** (no account needed) — drag the folder onto `app.netlify.com/drop`.
-
-Then on your phone open that URL and:
+On your phone open that URL and:
 - **iPhone (Safari)** — Share → **Add to Home Screen**
 - **Android (Chrome)** — ⋮ → **Add to Home screen**
 
@@ -188,11 +218,30 @@ The public USTA / Serve Tennis tournament search
 login, so **there's no USTA account to connect and no password stored anywhere**.
 ZIP codes are resolved by [zippopotam.us](https://api.zippopotam.us).
 
+**UTR** comes from the public event search behind
+[app.utrsports.net](https://app.utrsports.net/search?type=events) — tennis only, no login.
+UTR only allows its own website to call that search from a browser, so:
+
+- **The desktop app** asks UTR directly through its built-in host (it isn't a browser), so
+  its UTR data is live.
+- **The phone/web version** reads a snapshot of every upcoming US event, rebuilt every
+  3 hours by the GitHub Action in `.github/workflows/pages.yml` and published with the site.
+  It covers the whole country on purpose: your location is never in the public file —
+  distance is worked out on your device. The status line shows how old the snapshot is.
+
+If UTR is ever unreachable when the Action runs, it re-publishes the last good snapshot
+rather than blanking the data.
+
+> GitHub pauses scheduled Actions on a repository with no activity for 60 days, and emails
+> you when it does. If UTR data on the phone stops updating, re-enable it under the repo's
+> **Actions** tab, or push any change.
+
 ### What it can't show you
 
-**Live entry counts.** How many players are already in your division isn't in the public
-feed — it's rendered on the tournament's own Players page, which the app can't read across
-domains. Every card has a **Who's in** button that opens that page in one tap.
+**Live entry counts for USTA.** How many players are already in your division isn't in
+USTA's public feed — it's rendered on the tournament's own Players page, which the app
+can't read across domains. USTA cards have a **Who's in** button that opens that page in
+one tap. (UTR does publish the count, so UTR cards show it directly.)
 
 Drive time is estimated from straight-line distance (~45 mph), so treat it as a rough sort.
 

@@ -7,6 +7,12 @@
 > Open that on your phone and add it to your home screen (step 4 below).
 > The rest of this page is kept as a record of how it was set up, and step 5 is
 > how you publish changes from now on.
+>
+> **Since UTR support (v1.3):** Pages no longer deploys straight from the branch. Step 3
+> below is superseded — **Settings → Pages → Source** is now **GitHub Actions**, and
+> `.github/workflows/pages.yml` builds the site on every push and every 3 hours (to
+> refresh the UTR snapshot). Don't switch it back to "Deploy from a branch", or the UTR
+> data file stops being published.
 
 Your phone can't reach a file sitting on your PC, so the app needs a web address.
 GitHub Pages gives you one for free, permanently, on `https://` — which matters here,
@@ -120,4 +126,5 @@ so each keeps its own ZIP, filters and starred tournaments. There's no account s
 sync them.
 
 **If the page 404s**, give it another minute — the first deploy is the slowest. After that,
-check Settings → Pages still shows branch `main` and folder `/ (root)`.
+check Settings → Pages still shows Source **GitHub Actions**, and that the latest run on
+the repo's **Actions** tab succeeded.
