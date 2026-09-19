@@ -731,10 +731,10 @@ function persist(){
   try{ if(mm) data["jtt.mm"]=mm; }catch(e){}
   try{ HOST.postMessage(JSON.stringify({type:"persist", data})); }catch(e){}
 }
-const saveS = () => { LS.set("jtt.settings", S); persist(); };
-const saveW = () => { LS.set("jtt.watch", [...watch]); persist(); };
+const saveS = () => { LS.set("jtt.settings", S); persist(); syncSoon(); };
+const saveW = () => { LS.set("jtt.watch", [...watch]); persist(); syncSoon(); };
 const saveN = () => { LS.set("jtt.sent", sent); persist(); };
-const saveSeen = () => { LS.set("jtt.seen", seen); persist(); };
+const saveSeen = () => { LS.set("jtt.seen", seen); persist(); syncSoon(); };
 const isUTR = () => S.source === "utr";
 
 /* ---------------- helpers ---------------- */
@@ -1498,6 +1498,8 @@ function openSettings(force){
 
     <div class="hint" id="sNote">Birth year drives the age division — on Jan 1 it moves you up on its own.</div>
 
+    <div class="mm-sub"><h3>Account</h3><div id="sAccount"></div></div>
+
     <details class="adv">
       <summary>Google Calendar — one-tap vs fully automatic</summary>
       <div class="body">
@@ -1540,6 +1542,7 @@ function openSettings(force){
     </div>`;
 
   scrim.appendChild(m); document.body.appendChild(scrim);
+  renderAccountPanel();
   m.querySelector("#sZip").focus();
 
   const close=()=>{ scrim.style.animation="fadeIn .25s var(--ease-soft) reverse both"; setTimeout(()=>scrim.remove(),230); };
@@ -1849,6 +1852,308 @@ function bind(){
       toast(`Version ${updateInfo.version} is out — open Settings to download it`,"⬆️",7000);
     }
   });
+}
+
+/* ============================================================
+   Accounts
+   ============================================================
+   An account exists for one reason: your setup follows you between devices.
+   Everything still works signed out — it just stays on that device.
+
+   Supabase holds the accounts (it hashes the passwords; we never see them) and
+   the synced data. The key below is the project's *public* key: it is meant to
+   ship inside the page, and every table has row-level security, so it can only
+   ever touch rows the signed-in person owns.
+
+   Sign-in is by email rather than username, deliberately: looking an email up
+   from a username would mean exposing that mapping to anyone, and without it a
+   forgotten password could never be reset. Your username is your display name.
+   ============================================================ */
+
+const SB_URL = "https://mgncoxtqklnmavztlihp.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1nbmNveHRxa2xubWF2enRsaWhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4NTQyNjEsImV4cCI6MjEwNTQzMDI2MX0.0UdLfOvxTvVXzAfgJg3IpQf4hUkEMyxxQJ0zQ4SGwcM";
+
+let session = LS.get("jtt.auth", null);      // {access_token, refresh_token, expires_at, user_id}
+let profile = LS.get("jtt.profile", null);   // {username, display_name, dob}
+const signedIn = () => !!(session && session.access_token);
+
+function saveSession(){ LS.set("jtt.auth", session); LS.set("jtt.profile", profile); }
+
+async function sbFetch(path, opts, useAuth){
+  const headers = Object.assign({ apikey: SB_KEY, "Content-Type": "application/json" }, (opts && opts.headers) || {});
+  if(useAuth !== false && session && session.access_token) headers.Authorization = "Bearer " + session.access_token;
+  const ac = new AbortController(), timer = setTimeout(()=>ac.abort(), 15000);
+  try{
+    const r = await fetch(SB_URL + path, {...(opts||{}), headers, signal: ac.signal});
+    const text = await r.text();
+    let body = null;
+    try{ body = text ? JSON.parse(text) : null; }catch(e){ body = text; }
+    if(!r.ok){
+      const err = new Error((body && (body.msg || body.message || body.error_description || body.error)) || `HTTP ${r.status}`);
+      err.status = r.status; err.body = body;
+      throw err;
+    }
+    return body;
+  }catch(e){
+    if(e.name === "AbortError") throw new Error("the server didn't answer in time");
+    throw e;
+  }finally{ clearTimeout(timer); }
+}
+
+/* Access tokens last an hour; swap a stale one for a fresh one and retry once. */
+async function sbAuthed(path, opts){
+  try{ return await sbFetch(path, opts); }
+  catch(e){
+    if(e.status !== 401 || !session || !session.refresh_token) throw e;
+    try{
+      const t = await sbFetch("/auth/v1/token?grant_type=refresh_token",
+        { method:"POST", body: JSON.stringify({ refresh_token: session.refresh_token }) }, false);
+      session = { access_token:t.access_token, refresh_token:t.refresh_token,
+                  expires_at: Date.now() + (t.expires_in||3600)*1000, user_id: t.user && t.user.id };
+      saveSession();
+    }catch(e2){
+      accountSignOut(true);                 // refresh token is dead — sign out quietly
+      throw new Error("Your session expired — sign in again");
+    }
+    return await sbFetch(path, opts);
+  }
+}
+
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,20}$/;
+const yearsSince = d => (Date.now() - new Date(d).getTime()) / (365.2425*24*3600*1000);
+
+async function accountSignUp({username, email, password, dob}){
+  username = clean(username, 20);
+  if(!USERNAME_RE.test(username)) throw new Error("Username: 3–20 characters, letters, numbers, . _ or -");
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email||"")) throw new Error("That email doesn't look right");
+  if((password||"").length < 8) throw new Error("Password must be at least 8 characters");
+  if(!dob || isNaN(new Date(dob))) throw new Error("Enter your date of birth");
+  const age = yearsSince(dob);
+  if(age < 5 || age > 100) throw new Error("That date of birth doesn't look right");
+
+  const out = await sbFetch("/auth/v1/signup",
+    { method:"POST", body: JSON.stringify({ email, password }) }, false);
+
+  if(!out.access_token){
+    /* Only happens if email confirmation is still switched on for the project. */
+    throw new Error("Check your email to confirm the account, then sign in");
+  }
+  session = { access_token: out.access_token, refresh_token: out.refresh_token,
+              expires_at: Date.now() + (out.expires_in||3600)*1000, user_id: out.user.id };
+  saveSession();
+
+  try{
+    const rows = await sbAuthed("/rest/v1/profiles",
+      { method:"POST", headers:{ Prefer:"return=representation" },
+        body: JSON.stringify({ id: session.user_id, username, display_name: username, dob }) });
+    profile = rows[0];
+  }catch(e){
+    if(e.status === 409 || /duplicate|unique/i.test(e.message)){
+      /* The account exists but has no username yet; the panel will ask again. */
+      profile = null; saveSession();
+      throw new Error("That username is taken — pick another one");
+    }
+    throw e;
+  }
+  saveSession();
+  await syncAfterSignIn();
+  return profile;
+}
+
+/* Used when signup made the account but the username clashed. */
+async function claimUsername(username){
+  username = clean(username, 20);
+  if(!USERNAME_RE.test(username)) throw new Error("Username: 3–20 characters, letters, numbers, . _ or -");
+  if(!session) throw new Error("Sign in first");
+  const dob = (profile && profile.dob) || LS.get("jtt.pendingDob", null);
+  if(!dob) throw new Error("Enter your date of birth again");
+  const rows = await sbAuthed("/rest/v1/profiles",
+    { method:"POST", headers:{ Prefer:"resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({ id: session.user_id, username, display_name: username, dob }) });
+  profile = rows[0]; saveSession();
+  return profile;
+}
+
+async function accountSignIn(email, password){
+  const t = await sbFetch("/auth/v1/token?grant_type=password",
+    { method:"POST", body: JSON.stringify({ email, password }) }, false);
+  session = { access_token:t.access_token, refresh_token:t.refresh_token,
+              expires_at: Date.now() + (t.expires_in||3600)*1000, user_id: t.user.id };
+  saveSession();
+  const rows = await sbAuthed(`/rest/v1/profiles?id=eq.${session.user_id}&select=username,display_name,dob`);
+  profile = rows[0] || null;
+  saveSession();
+  await syncAfterSignIn();
+  return profile;
+}
+
+function accountSignOut(quiet){
+  session = null; profile = null;
+  try{ localStorage.removeItem("jtt.auth"); localStorage.removeItem("jtt.profile"); }catch(e){}
+  if(!quiet) toast("Signed out — this device keeps its own copy","✓");
+  renderAccountPanel();
+}
+
+async function resetPassword(email){
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email||"")) throw new Error("Enter the email you signed up with");
+  await sbFetch("/auth/v1/recover", { method:"POST", body: JSON.stringify({ email }) }, false);
+}
+
+/* ---------------- syncing your setup between devices ---------------- */
+/* Only the things that are yours wherever you are: settings, saved tournaments,
+   and which deadlines you've already been told about. Matchmaking identity stays
+   per-device on purpose, so two devices don't fight over one post. */
+const SYNC_KEYS = ["jtt.settings", "jtt.watch", "jtt.seen"];
+let syncTimer = null, syncing = false;
+
+function localBundle(){
+  return { at: Date.now(), "jtt.settings":S, "jtt.watch":[...watch], "jtt.seen":seen };
+}
+function applyBundle(d){
+  if(!d || typeof d !== "object") return false;
+  if(d["jtt.settings"]) { S = Object.assign({}, defaults, d["jtt.settings"]); LS.set("jtt.settings", S); }
+  if(Array.isArray(d["jtt.watch"])) { watch = new Set(d["jtt.watch"]); LS.set("jtt.watch", [...watch]); }
+  if(d["jtt.seen"]) { seen = Object.assign({usta:{},utr:{},_new:{usta:{},utr:{}},_keys:{}}, d["jtt.seen"]); LS.set("jtt.seen", seen); }
+  return true;
+}
+
+async function syncPush(){
+  if(!signedIn() || syncing) return;
+  syncing = true;
+  try{
+    const data = localBundle();
+    await sbAuthed("/rest/v1/user_data",
+      { method:"POST", headers:{ Prefer:"resolution=merge-duplicates" },
+        body: JSON.stringify({ user_id: session.user_id, data, updated_at: new Date().toISOString() }) });
+    LS.set("jtt.syncAt", data.at);
+  }catch(e){ /* offline or expired; the next save tries again */ }
+  finally{ syncing = false; }
+}
+const syncSoon = () => { if(!signedIn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 3000); };
+
+/* On sign-in, whichever copy is newer wins. */
+async function syncAfterSignIn(){
+  if(!signedIn()) return;
+  let rows;
+  try{ rows = await sbAuthed(`/rest/v1/user_data?user_id=eq.${session.user_id}&select=data`); }
+  catch(e){ return; }
+  const remote = rows && rows[0] && rows[0].data;
+  const localAt = LS.get("jtt.syncAt", 0);
+  if(remote && typeof remote.at === "number" && remote.at > localAt){
+    applyBundle(remote);
+    LS.set("jtt.syncAt", remote.at);
+    syncControls(); render();
+    toast("Your setup was restored from your account","☁️",4200);
+    if(S.lat != null) search();
+  } else {
+    await syncPush();
+  }
+}
+
+/* ---------------- the Account panel in Settings ---------------- */
+function renderAccountPanel(){
+  const box = $("#sAccount"); if(!box) return;
+  box.innerHTML = "";
+
+  if(!signedIn()){
+    box.appendChild(el("p","fine","Signing in keeps your ZIP, filters and saved tournaments the same on your phone and your computer. Everything works without one."));
+    const row = el("div","mm-actions");
+    const mk = el("button","act primary","Create account"); mk.onclick = () => accountForm("signup");
+    const si = el("button","act","Sign in");               si.onclick = () => accountForm("signin");
+    row.appendChild(mk); row.appendChild(si);
+    box.appendChild(row);
+    return;
+  }
+
+  if(!profile){
+    box.appendChild(el("p","fine","Almost there — choose the username other players will see."));
+    accountForm("username", box);
+    return;
+  }
+
+  const who = el("div","court-chip");
+  who.appendChild(el("div","n", profile.display_name || profile.username));
+  const age = profile.dob ? Math.floor(yearsSince(profile.dob)) : null;
+  who.appendChild(el("div","d", [`@${profile.username}`, age!=null ? `${age} years old` : null,
+    age!=null && age < 18 ? "Matchmaking is 18+" : null].filter(Boolean).join(" · ")));
+  box.appendChild(who);
+
+  const row = el("div","mm-actions");
+  const rn = el("button","act","Change display name");
+  rn.onclick = () => accountForm("rename");
+  const sy = el("button","act","Sync now");
+  sy.onclick = async () => { sy.disabled=true; sy.textContent="Syncing…"; await syncPush(); sy.textContent="Synced ✓"; setTimeout(()=>{ sy.textContent="Sync now"; sy.disabled=false; },1800); };
+  const so = el("button","act","Sign out"); so.onclick = () => accountSignOut();
+  row.appendChild(rn); row.appendChild(sy); row.appendChild(so);
+  box.appendChild(row);
+}
+
+function accountForm(mode, host){
+  const box = host || $("#sAccount");
+  box.innerHTML = "";
+  const f = el("div","mm-form");
+  const field = (label, node) => { const w = el("div","field wide"); w.appendChild(el("label",null,label)); w.appendChild(node); f.appendChild(w); return node; };
+  const note = el("div","hint");
+
+  let userI, emailI, passI, dobI;
+  if(mode === "signup" || mode === "username") userI  = field("Username", inp("", "shown to other players", 20));
+  if(mode === "rename")                        userI  = field("Display name", inp(profile.display_name||"", "", 24));
+  if(mode === "signup" || mode === "signin")   emailI = field("Email", (()=>{ const i=inp("", mode==="signup" ? "only used to reset your password" : "", 120); i.type="email"; i.autocomplete="email"; return i; })());
+  if(mode === "signup" || mode === "signin")   passI  = field("Password", (()=>{ const i=inp("", mode==="signup" ? "at least 8 characters" : "", 72); i.type="password"; i.autocomplete=mode==="signup"?"new-password":"current-password"; return i; })());
+  if(mode === "signup"){ dobI = field("Date of birth", (()=>{ const i=inp("","",10); i.type="date"; return i; })()); }
+
+  box.appendChild(f);
+  box.appendChild(note);
+
+  const row = el("div","mm-actions");
+  const go = el("button","btn", mode==="signup" ? "Create account" : mode==="signin" ? "Sign in" : "Save");
+  go.onclick = async () => {
+    note.classList.remove("bad"); note.textContent = "Working…";
+    go.disabled = true;
+    try{
+      if(mode === "signup"){
+        LS.set("jtt.pendingDob", dobI.value);
+        await accountSignUp({ username:userI.value, email:emailI.value, password:passI.value, dob:dobI.value });
+        toast(`Welcome, ${profile.display_name}`,"👋");
+      } else if(mode === "signin"){
+        await accountSignIn(emailI.value, passI.value);
+        toast(profile ? `Signed in as ${profile.display_name}` : "Signed in","👋");
+      } else if(mode === "username"){
+        await claimUsername(userI.value);
+        toast(`You're set up as ${profile.display_name}`,"👋");
+      } else {
+        const name = clean(userI.value, 24);
+        if(!name) throw new Error("Pick a name");
+        await sbAuthed(`/rest/v1/profiles?id=eq.${session.user_id}`,
+          { method:"PATCH", headers:{ Prefer:"return=representation" }, body: JSON.stringify({ display_name:name }) });
+        profile.display_name = name; saveSession();
+        if(mm && mm.draft) { mm.draft.name = name; saveMM(); }
+        toast("Name updated","✓");
+      }
+      renderAccountPanel();
+    }catch(e){
+      note.textContent = e.message;
+      note.classList.add("bad");
+      go.disabled = false;
+    }
+  };
+  row.appendChild(go);
+
+  if(mode === "signin"){
+    const fp = el("button","act","Forgot password");
+    fp.onclick = async () => {
+      note.classList.remove("bad");
+      try{ await resetPassword(emailI.value); note.textContent = "If that email has an account, a reset link is on its way."; }
+      catch(e){ note.textContent = e.message; note.classList.add("bad"); }
+    };
+    row.appendChild(fp);
+  }
+  if(mode !== "username"){
+    const back = el("button","act","Back"); back.onclick = renderAccountPanel;
+    row.appendChild(back);
+  }
+  box.appendChild(row);
+  (userI || emailI).focus();
 }
 
 /* ============================================================
