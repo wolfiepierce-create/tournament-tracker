@@ -203,6 +203,16 @@ header.nav{
 /* UTR runs 1-12, so the control has to be able to wrap on a phone */
 .seg{flex-wrap:wrap}
 .seg button{min-width:30px}
+@media (max-width:620px){
+  /* Two even rows of six rather than a ragged wrap */
+  .seg.utr{display:grid;grid-template-columns:repeat(6,1fr);width:100%}
+  .seg-row .seg-label{width:100%}
+}
+@media (max-width:480px){
+  /* Room for the title beside the source picker */
+  .brand svg{display:none}
+  .brand h1{font-size:15px}
+}
 
 /* Source picker - a quiet pill beside the title */
 .title-row{display:flex;align-items:center;gap:9px;min-width:0}
@@ -1408,6 +1418,7 @@ function buildAgeSelect(){
 function buildLevelSeg(){
   const seg=$("#lvlSeg"); seg.innerHTML="";
   const utr=isUTR();
+  seg.classList.toggle("utr", utr);
   $("#lvlLabel").textContent = utr ? "UTR" : "Level";
   const values = utr
     ? Array.from({length:UTR_MAX},(_,i)=>String(i+1))
