@@ -1,5 +1,13 @@
 # Putting the tracker on your phone with GitHub Pages
 
+> ## ✅ This is already done
+>
+> **Your site is live at <https://wolfiepierce-create.github.io/tournament-tracker/>**
+>
+> Open that on your phone and add it to your home screen (step 4 below).
+> The rest of this page is kept as a record of how it was set up, and step 5 is
+> how you publish changes from now on.
+
 Your phone can't reach a file sitting on your PC, so the app needs a web address.
 GitHub Pages gives you one for free, permanently, on `https://` — which matters here,
 because **alerts only work on `https://`**.
