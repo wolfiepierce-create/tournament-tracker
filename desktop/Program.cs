@@ -138,6 +138,47 @@ internal sealed class MainForm : Form
         return reader.ReadToEnd();
     }
 
+    // ---------------------------------------------------------------- UTR
+
+    private static readonly HttpClient Http = CreateHttp();
+
+    private static HttpClient CreateHttp()
+    {
+        var c = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("JuniorTournamentTracker/1.3 (personal use)");
+        c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        return c;
+    }
+
+    private static async Task<CoreWebView2WebResourceResponse> ProxyUtrAsync(
+        CoreWebView2Environment env, string query)
+    {
+        // Only the event search is reachable, and only for tennis - the page cannot
+        // use this to reach anything else on UTR, let alone the wider internet.
+        string q = query.TrimStart('?');
+        q = System.Text.RegularExpressions.Regex.Replace(q, @"(^|&)show(Tennis|Pickleball)Content=[^&]*", "");
+        q = "showTennisContent=true&showPickleballContent=false&" + q.TrimStart('&');
+
+        int status = 502;
+        string reason = "Bad Gateway";
+        string json;
+        try
+        {
+            using HttpResponseMessage r = await Http.GetAsync("https://api.utrsports.net/v2/search/events?" + q);
+            status = (int)r.StatusCode;
+            reason = r.ReasonPhrase ?? "";
+            json = await r.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            json = JsonSerializer.Serialize(new { error = "UTR unreachable", message = ex.Message });
+        }
+
+        return env.CreateWebResourceResponse(
+            new MemoryStream(Encoding.UTF8.GetBytes(json)), status, reason,
+            "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
+    }
+
     private static Icon LoadAppIcon()
     {
         string? path = Environment.ProcessPath;
@@ -181,8 +222,27 @@ internal sealed class MainForm : Form
         // Answer every request to our own host from memory. The https scheme is
         // what makes this a secure context, which is what lets notifications work.
         core.AddWebResourceRequestedFilter($"https://{VirtualHost}/*", CoreWebView2WebResourceContext.All);
-        core.WebResourceRequested += (_, e) =>
+        core.WebResourceRequested += async (_, e) =>
         {
+            var uri = new Uri(e.Request.Uri);
+
+            // /utr/search?... is forwarded to UTR's event search. UTR only lets its
+            // own website call that API from a browser, but this host is not a
+            // browser, so the desktop app gets live UTR data with no middleman.
+            if (uri.AbsolutePath.StartsWith("/utr/search", StringComparison.OrdinalIgnoreCase))
+            {
+                CoreWebView2Deferral deferral = e.GetDeferral();
+                try
+                {
+                    e.Response = await ProxyUtrAsync(env, uri.Query);
+                }
+                finally
+                {
+                    deferral.Complete();
+                }
+                return;
+            }
+
             var body = new MemoryStream(Encoding.UTF8.GetBytes(_html));
             e.Response = env.CreateWebResourceResponse(
                 body, 200, "OK",
@@ -273,6 +333,35 @@ internal sealed class MainForm : Form
         // ExecuteScriptAsync hands back a JSON-encoded string; unwrap one level.
         string inner = JsonSerializer.Deserialize<string>(probe) ?? probe;
 
+        // Exercise the live UTR route through the same fetch the app uses.
+        await core.ExecuteScriptAsync(
+            "window.__utrProbe=null;fetch('/utr/search?top=1&distance=45mi&pin=40.74,-74.38')" +
+            ".then(r=>r.json()).then(j=>window.__utrProbe='total='+j.total+' hits='+(j.hits||[]).length)" +
+            ".catch(e=>window.__utrProbe='ERR '+e.message)");
+        string utrProbe = "timeout";
+        for (int i = 0; i < 60; i++)
+        {
+            string v = await core.ExecuteScriptAsync("window.__utrProbe");
+            if (v != "null") { utrProbe = JsonSerializer.Deserialize<string>(v) ?? v; break; }
+            await Task.Delay(250);
+        }
+
+        // Run the app's own UTR pipeline end to end - fetch, normalise, junior
+        // detection - against a fixed location, restoring the page's settings after.
+        await core.ExecuteScriptAsync(
+            "window.__utrFlow=null;(async()=>{const o={lat:S.lat,lon:S.lon,r:S.radius};" +
+            "try{S.lat=40.7409;S.lon=-74.3834;S.radius=45;const {all,near}=await fetchUtr();" +
+            "const j=near.filter(t=>t.junior),s=j[0]||near[0];" +
+            "window.__utrFlow='near='+near.length+' junior='+j.length+(s?' | e.g. '+s.name.slice(0,34)+' / UTR '+utrRangeText(s)+' / '+s.miles+'mi / reg '+s.registered:'');}" +
+            "catch(e){window.__utrFlow='ERR '+e.message}finally{S.lat=o.lat;S.lon=o.lon;S.radius=o.r;}})()");
+        string utrFlow = "timeout";
+        for (int i = 0; i < 120; i++)
+        {
+            string v = await core.ExecuteScriptAsync("window.__utrFlow");
+            if (v != "null") { utrFlow = JsonSerializer.Deserialize<string>(v) ?? v; break; }
+            await Task.Delay(250);
+        }
+
         // Drive fullscreen exactly the way the user does: let the page see an F11
         // keypress and watch it come back through the bridge.
         await core.ExecuteScriptAsync(
@@ -287,6 +376,8 @@ internal sealed class MainForm : Form
         bool fsOff = !_fullscreen && FormBorderStyle != FormBorderStyle.None;
 
         string report = inner.TrimEnd('}')
+            + $",\"utrLive\":\"{utrProbe}\""
+            + $",\"utrFlow\":{JsonSerializer.Serialize(utrFlow)}"
             + $",\"fullscreenOn\":{(fsOn ? "true" : "false")}"
             + $",\"fullscreenRestored\":{(fsOff ? "true" : "false")}"
             + $",\"navOk\":{(_navOk ? "true" : "false")}"

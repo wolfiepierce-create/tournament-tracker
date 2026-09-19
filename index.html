@@ -197,6 +197,34 @@ header.nav{
 /* segmented level control */
 .seg-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:18px}
 .seg-label{font-size:11px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-3)}
+/* UTR runs 1-12, so the control has to be able to wrap on a phone */
+.seg{flex-wrap:wrap}
+.seg button{min-width:30px}
+
+/* Source picker - a quiet pill beside the title */
+.title-row{display:flex;align-items:center;gap:9px;min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.srcsel{position:relative;display:inline-flex;flex:none}
+.srcsel select{
+  appearance:none;-webkit-appearance:none;
+  background:var(--surface-2);border:1px solid transparent;color:var(--ink);
+  border-radius:999px;padding:3px 24px 3px 10px;
+  font-size:12px;font-weight:600;letter-spacing:.01em;cursor:pointer;
+  transition:background .25s var(--ease-soft), border-color .25s var(--ease-soft), box-shadow .25s var(--ease-soft);
+}
+.srcsel::after{
+  content:"";position:absolute;right:10px;top:50%;width:5px;height:5px;margin-top:-4px;
+  border-right:1.5px solid var(--ink-3);border-bottom:1.5px solid var(--ink-3);
+  transform:rotate(45deg);pointer-events:none;
+}
+.srcsel select:hover{background:var(--surface-3)}
+.srcsel select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* A soft cross-fade when the source changes, so the swap feels deliberate */
+@media (prefers-reduced-motion:no-preference){
+  .swap{animation:swapIn .45s var(--ease) both}
+  @keyframes swapIn{from{opacity:.25;transform:translateY(6px)}to{opacity:1;transform:none}}
+}
 .seg{display:inline-flex;background:var(--surface-2);border-radius:11px;padding:3px;gap:2px}
 .seg button{
   background:transparent;border:0;border-radius:8px;
@@ -281,6 +309,7 @@ header.nav{
 .tag.st-warn{background:var(--warn-soft);color:var(--warn)}
 .tag.st-ok{background:var(--ok-soft);color:var(--ok)}
 .tag.st-dead{background:var(--dead-soft);color:var(--dead)}
+.tag.st-new{background:var(--accent-soft);color:var(--accent)}
 
 .facts{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:13.5px;margin:0}
 .facts dt{color:var(--ink-3);font-weight:500}
@@ -387,7 +416,16 @@ footer.foot{
         <path d="M18 20a58 58 0 0 1 0 60M82 20a58 58 0 0 0 0 60" stroke="currentColor" stroke-width="8" fill="none"/>
       </svg>
       <div style="min-width:0">
-        <h1>Tournaments</h1>
+        <div class="title-row">
+          <h1>Tournaments</h1>
+          <label class="srcsel" title="Where tournaments come from">
+            <span class="sr">Source</span>
+            <select id="fSource" autocomplete="off">
+              <option value="usta">USTA</option>
+              <option value="utr">UTR</option>
+            </select>
+          </label>
+        </div>
         <div class="sub" id="whoami">—</div>
       </div>
     </div>
@@ -405,25 +443,25 @@ footer.foot{
     <div class="ctl-row">
       <div class="field w-zip"><label for="fZip">ZIP</label><input id="fZip" inputmode="numeric" maxlength="5" placeholder="07928"></div>
       <div class="field w-sm"><label for="fRadius">Max drive</label>
-        <select id="fRadius">
+        <select id="fRadius" autocomplete="off">
           <option value="25">~30 min · 25 mi</option>
           <option value="35">~45 min · 35 mi</option>
           <option value="45" selected>~1 hour · 45 mi</option>
           <option value="70">~1.5 hours · 70 mi</option>
         </select>
       </div>
-      <div class="field w-sm"><label for="fAge">Division</label><select id="fAge"></select></div>
+      <div class="field w-sm" id="wrapAge"><label for="fAge">Division</label><select id="fAge" autocomplete="off"></select></div>
       <div class="field w-sm"><label for="fGender">Gender</label>
-        <select id="fGender"><option value="">Any</option><option value="boys">Boys</option><option value="girls">Girls</option></select>
+        <select id="fGender" autocomplete="off"><option value="">Any</option><option value="boys">Boys</option><option value="girls">Girls</option></select>
       </div>
       <div class="field w-sm"><label for="fMonths">Ahead</label>
-        <select id="fMonths">
+        <select id="fMonths" autocomplete="off">
           <option value="1">1 month</option><option value="3" selected>3 months</option>
           <option value="6">6 months</option><option value="12">12 months</option>
         </select>
       </div>
       <div class="field w-md"><label for="fSort">Sort</label>
-        <select id="fSort">
+        <select id="fSort" autocomplete="off">
           <option value="deadline">Deadline</option>
           <option value="start">Tournament date</option>
           <option value="distance">Distance</option>
@@ -434,18 +472,10 @@ footer.foot{
     </div>
 
     <div class="seg-row">
-      <span class="seg-label">Level</span>
-      <div class="seg" id="lvlSeg">
-        <button data-lvl="1" aria-pressed="false">1</button>
-        <button data-lvl="2" aria-pressed="false">2</button>
-        <button data-lvl="3" aria-pressed="false">3</button>
-        <button data-lvl="4" aria-pressed="false">4</button>
-        <button data-lvl="5" aria-pressed="false">5</button>
-        <button data-lvl="6" aria-pressed="false">6</button>
-        <button data-lvl="7" aria-pressed="false">7</button>
-        <button data-lvl="other" aria-pressed="false">Other</button>
-      </div>
+      <span class="seg-label" id="lvlLabel">Level</span>
+      <div class="seg" id="lvlSeg"></div>
       <span style="flex:1"></span>
+      <button class="toggle" id="chipJunior" aria-pressed="true" hidden>Juniors only</button>
       <button class="toggle" id="chipOpen" aria-pressed="true">Open for entry</button>
       <button class="toggle" id="chipSingles" aria-pressed="false">Singles only</button>
     </div>
@@ -481,6 +511,18 @@ const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 /* Running inside the WebView2 desktop shell? */
 const HOST = (typeof window !== "undefined" && window.chrome && window.chrome.webview) ? window.chrome.webview : null;
 
+/* UTR only lets its own website call its API from a browser, so there are two
+   routes to the same data:
+   • Desktop app — the shell forwards /utr/search live (it isn't a browser).
+   • Everywhere else — a snapshot of every US event, rebuilt every 3 hours by a
+     GitHub Action and served with the site. It covers the whole country, so the
+     public file reveals nothing about where you live; distance is worked out here. */
+const UTR_SNAPSHOT = "https://wolfiepierce-create.github.io/tournament-tracker/data/utr-events.json";
+const UTR_SITE     = "https://app.utrsports.net/events/";
+const UTR_MAX      = 12;
+
+const SOURCES = { usta:"USTA", utr:"UTR" };
+
 const AGE_DIVS = [
   {code:"U8",  label:"8 & under",  max:8},
   {code:"U10", label:"10 & under", max:10},
@@ -499,6 +541,7 @@ const defaults = {
   zip:"", birthYear:null, gender:"", radius:45, months:3,
   ageDiv:"auto", levels:[], onlyOpen:true, singlesOnly:false, sort:"deadline",
   lat:null, lon:null, place:"", notify:false, theme:"auto", gcalClientId:"",
+  source:"usta", utrLevels:[], juniorsOnly:true,
 };
 /* The desktop shell keeps a copy of everything below in a file beside the app,
    and hands it back here as window.__restored before the page runs. That is what
@@ -518,7 +561,11 @@ function loadPart(key, fallback){
 let S     = Object.assign({}, defaults, loadPart("jtt.settings", {}));
 let watch = new Set(loadPart("jtt.watch", []));
 let sent  = loadPart("jtt.sent", {});
+/* Every tournament id we have ever been shown, per source. A tournament is
+   "new" when it turns up in a fetch and isn't in here yet. */
+let seen  = Object.assign({usta:{}, utr:{}}, loadPart("jtt.seen", {}));
 let ALL = [], viewWatchOnly = false;
+let utrAsOf = null;                       // when the UTR data was produced
 
 /* Mirror the durable bits out to the shell. The tournament cache is left out
    on purpose: it is large and rebuilds itself on the next refresh. */
@@ -526,13 +573,15 @@ function persist(){
   if(!HOST) return;
   try{
     HOST.postMessage(JSON.stringify({type:"persist", data:{
-      "jtt.settings":S, "jtt.watch":[...watch], "jtt.sent":sent,
+      "jtt.settings":S, "jtt.watch":[...watch], "jtt.sent":sent, "jtt.seen":seen,
     }}));
   }catch(e){}
 }
 const saveS = () => { LS.set("jtt.settings", S); persist(); };
 const saveW = () => { LS.set("jtt.watch", [...watch]); persist(); };
 const saveN = () => { LS.set("jtt.sent", sent); persist(); };
+const saveSeen = () => { LS.set("jtt.seen", seen); persist(); };
+const isUTR = () => S.source === "utr";
 
 /* ---------------- helpers ---------------- */
 const $  = s => document.querySelector(s);
@@ -554,6 +603,14 @@ function feeLabel(list){
   const v=[...new Set(list.filter(x=>x!=null))].sort((a,b)=>a-b);
   if(!v.length) return "Not listed";
   return v.length===1 ? money(v[0]) : `${money(v[0])} – ${money(v[v.length-1])}`;
+}
+/* UTR publishes fees as text ("$82 Division Fees", "Free Event"); keep its wording. */
+function feeText(t,evs){
+  if(t.source==="utr"){
+    const s=(t.feeText||"").replace(/\s*Division Fees?/i,"").replace(/Event$/,"").trim();
+    return s || "Not listed";
+  }
+  return feeLabel(evs.map(e=>e.fee));
 }
 const fmtDate = (iso,o) => iso ? new Date(iso).toLocaleDateString(undefined,o||{month:"short",day:"numeric",year:"numeric"}) : "—";
 function fmtRange(a,b){
@@ -578,8 +635,17 @@ function levelOf(name){
   const m=/level\s*(\d)/i.exec(name);
   return m ? {n:m[1],label:name} : {n:"other",label:name};
 }
-/* "L6" / "L1" — or a short word for unsanctioned events */
-function levelTag(t){ return t.level==="other" ? "L0" : "L"+t.level; }
+/* "L6" / "L1" — or a short word for unsanctioned events; "UTR 1–5" for UTR */
+function levelTag(t){
+  if(t.source==="utr") return "UTR " + utrRangeText(t);
+  return t.level==="other" ? "L0" : "L"+t.level;
+}
+const trimNum = n => Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/,"");
+function utrRangeText(t){
+  if(t.utrLo==null) return "any";
+  if(t.utrHi==null || t.utrHi>=16) return trimNum(t.utrLo)+"+";
+  return `${trimNum(t.utrLo)}–${trimNum(t.utrHi)}`;
+}
 
 /* ---------------- toasts ---------------- */
 function toast(msg, emoji, ms){
@@ -664,24 +730,151 @@ function normalise(rows){
   }).filter(t=>t.id);
 }
 
+/* ---------------- fetch UTR ---------------- */
+
+/* UTR's search has no age field, so juniors are recognised from what event
+   directors write in the event and division names: "Junior", "12U", "Boys 14s",
+   red/orange/green ball, high school, and so on. */
+const JUNIOR_RE = new RegExp([
+  "\\bjunior", "\\bjuniors?\\b", "\\bjrs?\\b\\.?", "\\byouth\\b", "\\bkids?\\b",
+  "\\bboys?\\b", "\\bgirls?\\b", "\\bhigh ?school\\b", "\\bhs\\b",
+  "\\b(?:8|9|10|11|12|13|14|15|16|17|18) ?u\\b", "\\bu ?(?:8|9|10|11|12|13|14|15|16|17|18)\\b",
+  "\\b(?:8|10|12|14|16|18) ?(?:&|and)? ?under\\b", "\\b(?:10|12|14|16|18)'?s\\b",
+  "\\b(?:red|orange|green) ball\\b", "\\bquickstart\\b",
+].join("|"), "i");
+
+const toRad = d => d*Math.PI/180;
+function milesBetween(lat1,lon1,lat2,lon2){
+  const R=3958.8, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+const utc = v => !v ? null : (/[zZ]|[+-]\d\d:\d\d$/.test(v) ? v : v+"Z");
+
+/* The desktop route returns UTR's raw search hits; the snapshot returns slim
+   records. Both are folded into the same shape here. */
+function slimFromHit(src){
+  const loc=(src.eventLocations||[])[0]||{}, sch=src.eventSchedule||{};
+  return {
+    id:src.id, name:src.name, club:src.club&&src.club.name,
+    lat:loc.lat, lng:loc.lng, city:loc.display, address:loc.googleFormattedName,
+    start:utc(sch.eventStartUtc), end:utc(sch.eventEndUtc),
+    regOpen:utc(sch.registrationStartUtc), regClose:utc(sch.registrationEndUtc),
+    utrRange:src.utrRange, price:src.priceRange, gender:src.gender, teamType:src.teamType,
+    registered:src.registeredCount, state:src.eventState&&src.eventState.value,
+    divisions:(src.eventDivisions||[]).map(d=>d&&d.name).filter(Boolean),
+  };
+}
+
+function priceToCents(txt){
+  if(!txt) return null;
+  if(/free/i.test(txt)) return 0;
+  const m=/\$\s*([\d,]+(?:\.\d+)?)/.exec(txt);
+  return m ? Math.round(parseFloat(m[1].replace(/,/g,""))*100) : null;
+}
+function parseUtrRange(s){
+  const m=/([\d.]+)\s*[-–]\s*([\d.]+)/.exec(s||"");
+  if(m) return [parseFloat(m[1]), parseFloat(m[2])];
+  const one=/([\d.]+)/.exec(s||"");
+  return one ? [parseFloat(one[1]), null] : [null,null];
+}
+const utrGender = g => /female|women|girl/i.test(g||"") ? "girls" : /\bmale\b|men|boy/i.test(g||"") ? "boys" : "";
+
+function normaliseUtr(list){
+  return list.map(e=>{
+    const [lo,hi]=parseUtrRange(e.utrRange);
+    const text=[e.name, ...(e.divisions||[])].join(" · ");
+    const miles=(e.lat!=null&&S.lat!=null) ? +milesBetween(S.lat,S.lon,e.lat,e.lng).toFixed(1) : null;
+    return {
+      source:"utr",
+      id:"utr-"+e.id, utrId:e.id,
+      name:(e.name||"Untitled event").trim(), code:"",
+      venue:e.club||"", town:e.city||"", address:e.address||e.city||"",
+      miles, level:null, levelLabel:null,
+      utrLo:lo, utrHi:hi,
+      start:e.start, end:e.end, deadline:e.regClose||null,
+      cancelled:/cancel/i.test(e.state||""),
+      registered:e.registered??null,
+      feeText:e.price||"", junior:JUNIOR_RE.test(text),
+      events:[{ div:"UTR", gender:utrGender(e.gender),
+                type:/double/i.test(e.teamType||"")?"doubles":"singles",
+                fee:priceToCents(e.price) }],
+      url:UTR_SITE+e.id, playersUrl:UTR_SITE+e.id,
+    };
+  }).filter(t=>t.utrId!=null);
+}
+
+/* Returns { all, near }: `all` is everything fetched (used to decide what is
+   genuinely new on UTR), `near` is what is inside your radius (what you see). */
+async function fetchUtr(){
+  let rows;
+
+  if(HOST){
+    /* Live, straight from UTR via the desktop shell, already limited to your radius. */
+    const today=new Date(); const mm=String(today.getMonth()+1).padStart(2,"0"), dd=String(today.getDate()).padStart(2,"0");
+    const base=`/utr/search?top=100&distance=${S.radius}mi&pin=${S.lat},${S.lon}`
+      + `&range=${encodeURIComponent("eventSchedule.eventStartUtc>"+mm+"/"+dd+"/"+today.getFullYear())}`;
+    rows=[]; let skip=0,total=Infinity,guard=0;
+    while(skip<total && guard++<20){
+      const r=await fetch(`${base}&skip=${skip}`);
+      if(!r.ok) throw new Error(`UTR HTTP ${r.status}`);
+      const j=await r.json();
+      total=j.total??0;
+      const hits=j.hits||[];
+      rows.push(...hits.map(h=>slimFromHit(h.source||{})));
+      if(!hits.length) break;
+      skip+=100;
+      setStatus(`Loading UTR ${Math.min(rows.length,total)} of ${total}…`,"load");
+    }
+    utrAsOf=new Date().toISOString();
+  } else {
+    /* The 3-hourly national snapshot. cache:"no-cache" still revalidates, so
+       a fresh build is picked up as soon as it is published. */
+    const r=await fetch(UTR_SNAPSHOT,{cache:"no-cache"});
+    if(!r.ok) throw new Error(`UTR snapshot HTTP ${r.status}`);
+    const j=await r.json();
+    rows=j.events||[];
+    utrAsOf=j.generatedAt||null;
+  }
+
+  const all=normaliseUtr(rows);
+  return { all, near: all.filter(t => t.miles==null || t.miles<=S.radius) };
+}
+
 /* ---------------- filter + sort ---------------- */
 function matchingEvents(t){
-  const div=activeDiv();
+  const div=activeDiv(), utr=t.source==="utr";
   return t.events.filter(e =>
-    e.div===div &&
+    (utr || e.div===div) &&
     (!S.gender || !e.gender || e.gender===S.gender) &&
     (!S.singlesOnly || e.type==="singles"));
+}
+
+/* A UTR band "5" means 5.00–5.99. An event matches a band when its allowed
+   range overlaps it at all. */
+function utrMatches(t){
+  if(!S.utrLevels.length) return true;
+  if(t.utrLo==null) return false;
+  const hi=t.utrHi==null ? 99 : t.utrHi;
+  return S.utrLevels.some(b=>{ const n=+b; return t.utrLo < n+1 && hi >= n; });
 }
 function applyFilters(){
   const now=Date.now();
   let list=ALL.filter(t=>{
     if(t.cancelled) return false;
     if(!matchingEvents(t).length) return false;
-    if(S.levels.length && !S.levels.includes(t.level)) return false;
+    if(t.source==="utr"){
+      if(!utrMatches(t)) return false;
+      if(S.juniorsOnly && !t.junior) return false;
+    } else if(S.levels.length && !S.levels.includes(t.level)) return false;
     if(S.onlyOpen){
       if(!t.deadline) return false;
       if(new Date(t.deadline).getTime()<=now) return false;
     }
+    /* The look-ahead window is applied here rather than in the fetch, so the
+       calendar rolling forward never makes old tournaments look "new". */
+    if(t.start && new Date(t.start).getTime() > now + S.months*31*DAY) return false;
+    if(t.source==="utr" && t.miles!=null && t.miles > S.radius) return false;
     return true;
   });
   if(viewWatchOnly) list=list.filter(t=>watch.has(t.id));
@@ -733,9 +926,13 @@ function gcalDetails(t){
   return [
     tournamentWhen(t),
     "",
-    `Level: ${t.level==="other" ? t.levelLabel : "USTA Level "+t.level}`,
-    `Division: ${divWords(activeDiv())}`,
-    `Entry fee: ${feeLabel(evs.map(e=>e.fee))}`,
+    t.source==="utr"
+      ? `UTR range: ${utrRangeText(t)}`
+      : `Level: ${t.level==="other" ? t.levelLabel : "USTA Level "+t.level}`,
+    t.source==="utr"
+      ? (t.registered!=null ? `Registered so far: ${t.registered}` : null)
+      : `Division: ${divWords(activeDiv())}`,
+    `Entry fee: ${feeText(t,evs)}`,
     t.deadline ? `Entries close: ${new Date(t.deadline).toLocaleString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}` : null,
     t.miles!=null ? `Distance: ${t.miles} mi from home` : null,
     t.code ? `Tournament ID: ${t.code}` : null,
@@ -917,7 +1114,7 @@ function notifyCheck(){
       if(fired>=3) { saveN(); return; }     /* never dump a pile at once */
       fireNotification(
         `${watched?"★ ":""}Entry ${th.word}`,
-        `${t.name}\n${fmtRange(t.start,t.end)} · ${t.miles!=null?t.miles+" mi · ":""}${feeLabel(matchingEvents(t).map(e=>e.fee))}`,
+        `${t.name}\n${fmtRange(t.start,t.end)} · ${t.miles!=null?t.miles+" mi · ":""}${feeText(t,matchingEvents(t))}`,
         t.url);
       sent[key]=now; fired++;
       break;
@@ -998,7 +1195,11 @@ function card(t,idx){
   c.appendChild(head);
 
   const tags=el("div","tags");
-  tags.appendChild(el("span","tag lv", t.level==="other" ? t.levelLabel : `Level ${t.level}`));
+  tags.appendChild(el("span","tag lv",
+    t.source==="utr" ? `UTR ${utrRangeText(t)}`
+    : t.level==="other" ? t.levelLabel : `Level ${t.level}`));
+  if(t.source==="utr" && t.junior) tags.appendChild(el("span","tag","Junior"));
+  if(isNew(t)) tags.appendChild(el("span","tag st-new","New"));
   tags.appendChild(el("span",`tag st-${st.cls}`, st.label));
   const g=[...new Set(evs.map(e=>e.gender).filter(Boolean))];
   if(g.length) tags.appendChild(el("span","tag", g.map(x=>x[0].toUpperCase()+x.slice(1)).join(" & ")));
@@ -1011,7 +1212,9 @@ function card(t,idx){
   add("Plays",fmtRange(t.start,t.end));
   add("Deadline", t.deadline?`${fmtDate(t.deadline)} · ${countdown(st.ms)}`:"Not published",
       st.cls==="ok"?null:`dl-${st.cls}`);
-  add("Entry fee",feeLabel(evs.map(e=>e.fee)));
+  add("Entry fee",feeText(t,evs));
+  if(t.source==="utr" && t.registered!=null)
+    add("Registered", t.registered===1 ? "1 player so far" : `${t.registered} players so far`);
   add("Where",[t.venue,t.town].filter(Boolean).join(" · ")||"—");
   if(t.miles!=null) add("Distance",`${t.miles} mi · about ${Math.round(t.miles/0.75)} min`);
   c.appendChild(dl);
@@ -1028,9 +1231,13 @@ function card(t,idx){
   go.href=t.url; go.target="_blank"; go.rel="noopener";
   f.appendChild(go);
 
-  const pl=el("a","act","Who's in");
-  pl.href=t.playersUrl; pl.target="_blank"; pl.rel="noopener";
-  f.appendChild(pl);
+  /* UTR already shows the registered count on the card; USTA doesn't publish
+     one, so it keeps the link to the players page. */
+  if(t.source!=="utr"){
+    const pl=el("a","act","Who's in");
+    pl.href=t.playersUrl; pl.target="_blank"; pl.rel="noopener";
+    f.appendChild(pl);
+  }
 
   c.appendChild(f);
   return c;
@@ -1041,19 +1248,22 @@ function render(){
   const grid=$("#grid"), box=$("#emptyBox");
   grid.innerHTML=""; box.innerHTML="";
 
-  const div=activeDiv(), age=currentAge();
+  const div=activeDiv(), age=currentAge(), utr=isUTR();
+  const scope = utr ? (S.juniorsOnly ? "UTR juniors" : "UTR events") : divWords(div);
   $("#whoami").textContent=[
     S.place||(S.zip?`ZIP ${S.zip}`:"Set your location"),
-    divWords(div),
+    scope,
     age?`age ${age}`:null,
   ].filter(Boolean).join(" · ");
 
   if(!list.length){
     const e=el("div","card-surface empty anim-in");
     e.appendChild(el("h3",null, ALL.length?"Nothing matches":"Nothing loaded yet"));
-    e.appendChild(el("p",null, ALL.length
-      ? `${ALL.length} junior tournaments are nearby, but none fit ${divWords(div)} with these filters. Try more levels, turn off “Open for entry”, or look further ahead.`
-      : "Add your ZIP code and press Refresh."));
+    e.appendChild(el("p",null, !ALL.length
+      ? "Add your ZIP code and press Refresh."
+      : utr
+        ? `${ALL.length} UTR events are nearby, but none fit these filters. Try more UTR levels, turn off “Juniors only” or “Open for entry”, or look further ahead.`
+        : `${ALL.length} junior tournaments are nearby, but none fit ${divWords(div)} with these filters. Try more levels, turn off “Open for entry”, or look further ahead.`));
     box.appendChild(e);
   } else {
     const frag=document.createDocumentFragment();
@@ -1062,9 +1272,12 @@ function render(){
   }
 
   const closing=list.filter(t=>{const s=statusOf(t);return s.ms!=null&&s.ms>0&&s.ms<=7*DAY;}).length;
-  setStatus(`${list.length} tournament${list.length===1?"":"s"} · ${divWords(div)}`
+  const fresh=list.filter(isNew).length;
+  setStatus(`${list.length} tournament${list.length===1?"":"s"} · ${scope}`
+    + (fresh?` · ${fresh} new`:"")
     + (closing?` · ${closing} closing within 7 days`:"")
-    + (viewWatchOnly?" · saved only":""));
+    + (viewWatchOnly?" · saved only":"")
+    + (utr && utrAsOf && !HOST ? ` · UTR data from ${ago(utrAsOf)}`:""));
 }
 
 /* ============================================================
@@ -1187,32 +1400,180 @@ function buildAgeSelect(){
   AGE_DIVS.forEach(d=>{ const o=el("option",null,d.label); o.value=d.code; sel.appendChild(o); });
   sel.value=S.ageDiv;
 }
+/* The rating control is rebuilt for whichever source is selected:
+   USTA levels 1–7 (+ Other), or UTR 1–12. */
+function buildLevelSeg(){
+  const seg=$("#lvlSeg"); seg.innerHTML="";
+  const utr=isUTR();
+  $("#lvlLabel").textContent = utr ? "UTR" : "Level";
+  const values = utr
+    ? Array.from({length:UTR_MAX},(_,i)=>String(i+1))
+    : ["1","2","3","4","5","6","7","other"];
+  const chosen = utr ? S.utrLevels : S.levels;
+  values.forEach(v=>{
+    const b=el("button",null, v==="other" ? "Other" : v);
+    b.dataset.lvl=v;
+    b.setAttribute("aria-pressed", chosen.includes(v));
+    b.title = utr ? `UTR ${v}.00–${v}.99` : (v==="other" ? "Junior Circuit & unsanctioned" : `USTA Level ${v}`);
+    b.onclick=()=>{
+      const key = isUTR() ? "utrLevels" : "levels";
+      S[key] = S[key].includes(v) ? S[key].filter(x=>x!==v) : [...S[key], v];
+      saveS(); buildLevelSeg(); render();
+    };
+    seg.appendChild(b);
+  });
+}
+
 function syncControls(){
+  $("#fSource").value=S.source;
   $("#fZip").value=S.zip||"";
   $("#fRadius").value=String(S.radius);
   $("#fGender").value=S.gender;
   $("#fMonths").value=String(S.months);
   $("#fSort").value=S.sort;
   buildAgeSelect();
-  document.querySelectorAll("#lvlSeg button").forEach(b=>
-    b.setAttribute("aria-pressed",S.levels.includes(b.dataset.lvl)));
+  buildLevelSeg();
+  /* UTR has no age divisions, so Division gives way to "Juniors only". */
+  $("#wrapAge").hidden = isUTR();
+  $("#chipJunior").hidden = !isUTR();
+  $("#chipJunior").setAttribute("aria-pressed",S.juniorsOnly);
   $("#chipOpen").setAttribute("aria-pressed",S.onlyOpen);
   $("#chipSingles").setAttribute("aria-pressed",S.singlesOnly);
   paintNotify();
 }
 
-async function search(){
+/* ---------------- new-tournament detection ---------------- */
+
+/* seen[source][id] = when it was first seen. seen._new holds the ones that
+   arrived after we started watching, which drives the "New" tag. seen._keys
+   remembers what area each baseline was taken for. */
+seen._new  = seen._new  || {usta:{}, utr:{}};
+seen._keys = seen._keys || {};
+
+const NEW_FOR = 3*DAY;
+function isNew(t){
+  const src=t.source||"usta", ts=(seen._new[src]||{})[t.id];
+  return !!ts && Date.now()-ts < NEW_FOR;
+}
+
+/* What each source fetches depends on these; if they change, the next fetch
+   re-baselines quietly instead of calling everything in the new area "new". */
+function fetchKey(src){
+  if(src==="utr" && !HOST) return "national";          // the snapshot is the whole US
+  return `${S.zip}|${S.radius}`;
+}
+
+function detectNew(src, fetched){
+  const bag = seen[src] || (seen[src] = {});
+  const newBag = seen._new[src] || (seen._new[src] = {});
+  const key = fetchKey(src);
+  const baseline = !Object.keys(bag).length || seen._keys[src] !== key;
+  const now = Date.now();
+
+  const freshIds = new Set();
+  for(const t of fetched){
+    if(!bag[t.id]){ bag[t.id]=now; if(!baseline){ newBag[t.id]=now; freshIds.add(t.id); } }
+  }
+  seen._keys[src] = key;
+
+  /* Forget ids unseen for six months so this never grows without bound. */
+  const alive = new Set(fetched.map(t=>t.id)), cut = now-180*DAY;
+  for(const id of Object.keys(bag)) if(!alive.has(id) && bag[id] < cut) delete bag[id];
+  for(const id of Object.keys(newBag)) if(now-newBag[id] > 30*DAY) delete newBag[id];
+  saveSeen();
+
+  if(baseline || !freshIds.size) return [];
+  /* Only the ones that match what you're looking for count. */
+  return applyFilters().filter(t => freshIds.has(t.id));
+}
+
+function announceNew(src, list){
+  if(!list.length) return;
+  const name = SOURCES[src];
+  if(document.visibilityState==="visible")
+    toast(list.length===1 ? `New ${name} tournament: ${list[0].name}` : `${list.length} new ${name} tournaments match your filters`, "✨", 5200);
+
+  if(!S.notify) return;
+  const cap=alertCapability();
+  if(!cap.ok || (cap.mode==="web" && Notification.permission!=="granted")) return;
+
+  /* A handful individually; beyond that, one summary instead of a flood. */
+  if(list.length<=3){
+    list.forEach(t=>fireNotification(
+      `New ${name} tournament`,
+      `${t.name}\n${fmtRange(t.start,t.end)} · ${t.miles!=null?t.miles+" mi · ":""}${feeText(t,matchingEvents(t))}`,
+      t.url));
+  } else {
+    fireNotification(`${list.length} new ${name} tournaments`,
+      list.slice(0,3).map(t=>"• "+t.name).join("\n") + `\n…and ${list.length-3} more`, null);
+  }
+}
+
+function ago(iso){
+  const m=Math.round((Date.now()-new Date(iso).getTime())/60000);
+  if(m<2) return "just now";
+  if(m<60) return `${m} min ago`;
+  const h=Math.round(m/60);
+  return h<48 ? `${h} h ago` : `${Math.round(h/24)} days ago`;
+}
+
+/* ---------------- search ---------------- */
+const cacheKey = src => "jtt.cache."+src;
+let searching=false;
+
+async function search(opts){
   if(!S.zip||S.lat==null){ openSettings(true); return; }
-  $("#btnSearch").disabled=true;
-  setStatus("Contacting USTA…","load");
+  if(searching) return;
+  searching=true;
+  const quiet = opts && opts.background;
+  const src = S.source, name = SOURCES[src];
+  if(!quiet){ $("#btnSearch").disabled=true; setStatus(`Contacting ${name}…`,"load"); }
   try{
-    ALL=normalise(await fetchAll(S.lat,S.lon,S.radius,S.months));
-    LS.set("jtt.cache",{at:Date.now(),zip:S.zip,radius:S.radius,months:S.months,data:ALL});
-    render(); notifyCheck();
+    let fetched, near;
+    if(src==="utr"){
+      ({all:fetched, near} = await fetchUtr());
+    } else {
+      /* 12 months ahead regardless of the "Ahead" setting — see applyFilters. */
+      fetched = near = normalise(await fetchAll(S.lat,S.lon,S.radius,12));
+    }
+    if(S.source!==src) return;              // switched source mid-fetch; drop it
+    ALL = near;
+    LS.set(cacheKey(src),{at:Date.now(),zip:S.zip,radius:S.radius,asOf:utrAsOf,data:ALL});
+    const fresh = detectNew(src, fetched);
+    render();
+    announceNew(src, fresh);
+    notifyCheck();
   }catch(err){
-    setStatus(`Couldn't reach USTA (${err.message}). Check your connection and press Refresh.`);
-    toast("Couldn't reach the USTA search","⚠️",5000);
-  }finally{ $("#btnSearch").disabled=false; }
+    if(!quiet){
+      setStatus(`Couldn't reach ${name} (${err.message}). Check your connection and press Refresh.`);
+      toast(`Couldn't reach ${name}`,"⚠️",5000);
+    }
+  }finally{
+    searching=false;
+    $("#btnSearch").disabled=false;
+  }
+}
+
+function loadCached(src){
+  const c=LS.get(cacheKey(src),null);
+  if(c && c.zip===S.zip && c.radius===S.radius && Array.isArray(c.data)){
+    ALL=c.data; utrAsOf=c.asOf||null;
+    return c;
+  }
+  ALL=[]; utrAsOf=null;
+  return null;
+}
+
+function switchSource(src){
+  if(!SOURCES[src] || src===S.source) return;
+  S.source=src; saveS();
+  syncControls();
+  const main=$("main");
+  main.classList.remove("swap"); void main.offsetWidth; main.classList.add("swap");
+  const c=loadCached(src);
+  render();
+  if(c) setStatus(`${SOURCES[src]} results from ${new Date(c.at).toLocaleString()} — refreshing…`,"load");
+  search();
 }
 
 function bind(){
@@ -1230,13 +1591,11 @@ function bind(){
   $("#fGender").onchange=e=>{ S.gender=e.target.value; saveS(); render(); };
   $("#fSort").onchange=e=>{ S.sort=e.target.value; saveS(); render(); };
   $("#fRadius").onchange=e=>{ S.radius=+e.target.value; saveS(); search(); };
-  $("#fMonths").onchange=e=>{ S.months=+e.target.value; saveS(); search(); };
+  /* Everything 12 months out is already loaded, so this only re-filters. */
+  $("#fMonths").onchange=e=>{ S.months=+e.target.value; saveS(); render(); };
 
-  document.querySelectorAll("#lvlSeg button").forEach(b=>b.onclick=()=>{
-    const v=b.dataset.lvl;
-    S.levels=S.levels.includes(v)?S.levels.filter(x=>x!==v):[...S.levels,v];
-    saveS(); syncControls(); render();
-  });
+  $("#fSource").onchange=e=>switchSource(e.target.value);
+  $("#chipJunior").onclick=()=>{ S.juniorsOnly=!S.juniorsOnly; saveS(); syncControls(); render(); };
   $("#chipOpen").onclick=()=>{ S.onlyOpen=!S.onlyOpen; saveS(); syncControls(); render(); };
   $("#chipSingles").onclick=()=>{ S.singlesOnly=!S.singlesOnly; saveS(); syncControls(); render(); };
 
@@ -1259,11 +1618,16 @@ function bind(){
   });
 
   setInterval(notifyCheck,30*60*1000);
+
+  /* Look for newly added tournaments every hour while the app is running —
+     in the desktop app that includes while it sits in the tray. */
   let lastFetch=Date.now();
+  const refresh=()=>{ if(S.lat==null) return; lastFetch=Date.now(); search({background:true}); };
+  setInterval(refresh, 60*60*1000);
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState!=="visible") return;
     render();
-    if(Date.now()-lastFetch>6*3600*1000&&S.lat!=null){ lastFetch=Date.now(); search(); }
+    if(Date.now()-lastFetch>60*60*1000) refresh();
     else notifyCheck();
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change",applyTheme);
@@ -1278,9 +1642,10 @@ function bind(){
 /* ---------------- boot ---------------- */
 (function init(){
   applyTheme(); bind(); syncControls();
-  const cache=LS.get("jtt.cache",null);
-  if(cache&&cache.zip===S.zip&&cache.radius===S.radius&&cache.months===S.months&&Array.isArray(cache.data)){
-    ALL=cache.data; render();
+  try{ localStorage.removeItem("jtt.cache"); }catch(e){}   // pre-1.3 single-source cache
+  const cache=loadCached(S.source);
+  if(cache){
+    render();
     setStatus(`Saved results from ${new Date(cache.at).toLocaleString()} — refreshing…`,"load");
   }
   if(!S.zip||S.lat==null) openSettings(true); else search();

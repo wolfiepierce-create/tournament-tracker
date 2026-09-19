@@ -1,0 +1,50 @@
+# Builds and deploys the site to GitHub Pages.
+#
+# Runs on every push (so code changes go live) and every 3 hours (so the UTR
+# snapshot stays fresh and the app can spot newly added tournaments).
+#
+# Deploying as an artifact rather than committing the data back means the
+# 3-hourly refresh never clutters the repository's history.
+
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 */3 * * *"   # off the hour, when GitHub's scheduler is less busy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Snapshot UTR events
+        shell: pwsh
+        run: ./scripts/fetch-utr.ps1 -Out _site/data/utr-events.json
+
+      - name: Assemble site
+        run: |
+          cp index.html _site/
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
