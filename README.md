@@ -47,7 +47,7 @@ The desktop app fixes this properly. It serves the page from a real internal add
 hands notifications to Windows itself. Verified on your machine:
 
 ```
-origin: https://tournaments.local   isSecureContext: true   hostBridge: true
+origin: https://appassets.example   isSecureContext: true   hostBridge: true
 ```
 
 Turn alerts on with the **◎ Alerts** button. You get a Windows notification 7, 3 and 1 days
@@ -153,23 +153,53 @@ actually appear on the site do.
 
 The **Tournaments | Matchmaking** switch at the top of the dashboard opens it.
 
-1. **Post "Want to play"** — display name, skill, singles/doubles, when, and an optional
-   note. It shows up for everyone using the app within your max-drive radius.
-2. **Someone taps "Find median court"** on your post. The app looks up public tennis
-   courts from OpenStreetMap between your two ZIP areas and ranks them by fairness — the
-   longer of the two drives as short as possible — e.g. *1.3 mi for you · 1.4 mi for them*.
-3. **They pick a court and a time and send an invite.** You get a notification (if Alerts
-   are on) and **Accept** or **Decline** in the app.
-4. **Match on** — it appears under *Confirmed matches* for both of you, with Directions and
+1. **Post "Want to play"** — display name, **skill** (Unranked, Beginner, Intermediate,
+   Advanced, Tournament, or UTR 1–16.5), singles/doubles, **when** (today, tomorrow, this
+   weekend, weekday evenings, flexible, or a specific date and time), an optional note, and
+   optionally **a court**. You can have **up to five posts live at once** — one per time you
+   could play.
+2. **Pin a court (optional).** *📍 Pin a court on the map* opens a map of your area with the
+   public courts from OpenStreetMap as blue dots — tap one, or tap anywhere to drop your own
+   pin. Or paste a Google Maps link. The app looks up the address and passes the details on:
+   other players see the court's name, how many courts, lights, surface and address.
+3. **Someone invites you.** If you pinned a court they tap *Invite to play here*; if not,
+   *Find median court* ranks public courts by fairness — the longer of the two drives as
+   short as possible (e.g. *1.3 mi for you · 1.4 mi for them*). They pick a time and send.
+   A player can send more than one invite for different times.
+4. **Accept or Decline.** Confirmed matches list the time, court details, Directions and
    Add to calendar.
+5. **Cancel** a confirmed match, or **Withdraw** an invite you sent — two taps, so a stray tap
+   can't do it. The other player is told straight away.
 
-Tested end to end both ways with a second player: post → found 2.2 mi away → fair court →
-invite → accept/decline delivered.
+Tested end to end both ways with a second player: two live time slots, a pinned court,
+invites to each, accept, decline, cancel from either side, withdraw, and each player's
+phone alert.
+
+### Notifications
+
+With **Alerts** on you're notified when someone **invites you**, **accepts or declines**,
+or **cancels / withdraws** — as a Windows notification in the desktop app, or a system
+notification on the web version.
+
+**Phones need one extra step to be told while the app is closed.** A phone pauses web pages
+in the background, so no web app can wake itself up to alert you. The free **ntfy** app can:
+open *Get invites on your phone even when this app is closed* at the bottom of your
+Matchmaking panel, tap *Open your alert channel*, and subscribe in ntfy. Every invite,
+answer and cancellation then arrives as a normal phone notification. Keep your channel name
+to yourself — anyone who has it can read your alerts.
+
+### Google Maps links
+
+Paste the link Google Maps gives you. Full links (`google.com/maps/...`) work everywhere.
+**Short share links (`maps.app.goo.gl/...`) — what the phone's *Share* button produces — only
+work in the desktop app**, because following them needs its built-in host; on the web
+version, open the link and copy the full address from the address bar instead, or just drop
+a pin on the map.
 
 ### What gets shared — and what never does
 
-A post carries your **display name, skill, format, availability, note, and your ZIP
-code's centre point** (not your location — everyone in 07928 shares the same point).
+A post carries your **display name, skill, format, availability, note, chosen court, and
+your ZIP code's centre point** (not your location — everyone in 07928 shares the same point).
 It never carries your address, age, birth year, phone or email. Phone numbers, emails,
 links and social handles typed into a note are replaced with *[removed]* before it's
 sent, and again on the receiving side. Court and time are agreed inside the app, so no
@@ -188,13 +218,16 @@ message relay with no account needed. That means:
 - **Posts are public by design.** Anyone who knows where to look on the relay can read
   them — which is why they contain nothing sensitive.
 - **The relay keeps messages 12 hours.** While your app is running it re-posts every
-  6 hours to stay visible; if it's closed for over 12 hours your post drops off. An
-  invite sent to you also has to be picked up within 12 hours.
+  6 hours to stay visible; if it's closed for over 12 hours your posts drop off. An invite
+  not picked up within 12 hours shows as *no answer* and you can invite again.
 - **The app checks for invites every 2 minutes** while it's open — and from the system
   tray in the desktop app.
+- **Your desktop and phone are separate players.** Each device has its own posts and inbox;
+  an invite to a post you made on your PC arrives on your PC.
 - **Finding courts can take up to ~30 seconds**, because the free OpenStreetMap service is
-  often busy. Answers are cached for a month per area. If it's down, the app offers a map
-  search centred between you instead.
+  often busy. Answers are cached for a month per area. If it's down, the app falls back to a
+  simpler search, or offers a map search centred between you.
+- **Map tiles come from OpenStreetMap**, which asks for light, personal use — fine for this.
 - **Only people using this app** can see posts. There's no moderation beyond hiding a
   player, so it suits a group you share the link with better than the open internet.
 
