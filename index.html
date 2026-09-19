@@ -639,6 +639,10 @@ const SITE = "https://playtennis.usta.com";
 const GEO  = z => `https://api.zippopotam.us/us/${z}`;
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
+/* The desktop shell injects its version; the web version is always current. */
+const APP_VERSION = (typeof window.__appVersion==="string" && window.__appVersion) || "web";
+let updateInfo = null;
+
 /* Running inside the WebView2 desktop shell? */
 const HOST = (typeof window !== "undefined" && window.chrome && window.chrome.webview) ? window.chrome.webview : null;
 
@@ -1510,6 +1514,26 @@ function openSettings(force){
       </div>
     </details>
 
+    <details class="adv">
+      <summary>About${updateInfo ? " — update available" : ""}</summary>
+      <div class="body">
+        ${updateInfo ? `<div class="notice slim"><span><strong>Version ${updateInfo.version}</strong> is out — you have ${APP_VERSION}.</span>
+          <a class="act primary" href="${updateInfo.url}" target="_blank" rel="noopener">Download</a></div>` : ""}
+        <p class="fine" style="margin:0 0 10px">
+          ${HOST ? `Desktop app, version ${APP_VERSION}.` : "Web version — always up to date."}
+        </p>
+        <p class="fine" style="margin:0 0 10px">
+          <strong>Not affiliated with, endorsed by, or connected to the USTA or UTR.</strong>
+          Tournament information comes from their public listings and can change without notice —
+          always confirm dates, fees and deadlines on the official tournament page before you pay.
+        </p>
+        <p class="fine" style="margin:0">
+          Tournaments: USTA / Serve Tennis and UTR Sports · Courts &amp; maps: OpenStreetMap ·
+          Matchmaking messages: ntfy.sh · ZIP codes: zippopotam.us
+        </p>
+      </div>
+    </details>
+
     <div class="sheet-foot">
       ${force?"":'<button class="btn-plain" id="sCancel">Cancel</button>'}
       <button class="btn" id="sSave">${force?"Start":"Save"}</button>
@@ -1819,6 +1843,11 @@ function bind(){
   if(HOST) HOST.addEventListener("message", ev => {
     let d; try{ d = typeof ev.data==="string" ? JSON.parse(ev.data) : ev.data; }catch(e){ return; }
     if(d && d.type==="recheck"){ notifyCheck(); mmTick(); }
+    /* The desktop app found a newer release on GitHub. */
+    if(d && d.type==="update" && d.version && d.url){
+      updateInfo={version:clean(d.version,16), url:String(d.url)};
+      toast(`Version ${updateInfo.version} is out — open Settings to download it`,"⬆️",7000);
+    }
   });
 }
 

@@ -1,0 +1,89 @@
+# Builds the Windows desktop app and publishes it as a GitHub Release.
+#
+# Push a version tag to cut a release:
+#     git tag v1.6.0 && git push origin v1.6.0
+#
+# The build happens here rather than on a PC on purpose: code-signing services
+# (SignPath's free open-source tier, Azure Trusted Signing) will only sign
+# binaries they watched a CI job build. The signing step below is ready to be
+# switched on once a signing account exists.
+
+name: Release desktop app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and release (e.g. v1.6.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Check the tag matches the app version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}" -replace '^v',''
+          $proj = Select-String -Path desktop/TournamentTracker.csproj -Pattern '<Version>(.+?)</Version>'
+          $ver = $proj.Matches[0].Groups[1].Value
+          "tag=$tag  csproj=$ver"
+          if ($tag -ne $ver) { throw "Tag v$tag doesn't match <Version>$ver</Version> in the csproj - bump one of them." }
+
+      - name: Build
+        shell: pwsh
+        run: dotnet publish desktop/TournamentTracker.csproj -c Release -o dist
+
+      # --- Code signing (enable once a signing account exists) -----------------
+      # SignPath's free tier for open-source projects:
+      #   - uses: signpath/github-action-submit-signing-request@v1
+      #     with:
+      #       api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #       organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+      #       project-slug: tournament-tracker
+      #       signing-policy-slug: release-signing
+      #       artifact-configuration-slug: exe
+      #       github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      #       wait-for-completion: true
+      #       output-artifact-directory: dist-signed
+      # Until then the .exe is unsigned and Windows shows a SmartScreen warning
+      # the first time someone runs it - the release notes below say so.
+
+      - id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tournament-Tracker-exe
+          path: dist/Tournament Tracker.exe
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $notes = @"
+**Junior Tournament Tracker $tag** - Windows desktop app. Nothing to install; just run it.
+
+### First run: Windows will warn you
+This app isn't code-signed yet, so Windows shows **"Windows protected your PC"**.
+Click **More info**, then **Run anyway**. It only happens once.
+
+### What it does
+Finds junior tennis tournaments near you from USTA and UTR, alerts you before entry
+deadlines close, and adds them to Google Calendar. Matchmaking finds someone nearby to hit with.
+
+Not affiliated with, endorsed by, or connected to the USTA or UTR. Always confirm
+dates, fees and deadlines on the official tournament page before paying.
+"@
+          gh release create $tag "dist/Tournament Tracker.exe" --title "Tournament Tracker $tag" --notes $notes

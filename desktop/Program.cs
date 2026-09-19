@@ -179,6 +179,56 @@ internal sealed class MainForm : Form
             "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
     }
 
+    // ---------------------------------------------------------------- updates
+
+    private const string Repo = "wolfiepierce-create/tournament-tracker";
+
+    internal static string CurrentVersion =>
+        (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0)).ToString(3);
+
+    /// <summary>
+    /// Asks GitHub for the newest release. Returns (tag, url) when it is newer
+    /// than this build, otherwise nulls. The web version updates itself, so this
+    /// exists only for the desktop app - where a stale copy would keep calling
+    /// endpoints that eventually change.
+    /// </summary>
+    internal static async Task<(string? Tag, string? Url)> CheckForUpdateAsync(string repo)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get,
+                $"https://api.github.com/repos/{repo}/releases/latest");
+            req.Headers.Accept.ParseAdd("application/vnd.github+json");
+            using HttpResponseMessage r = await Http.SendAsync(req);
+            if (!r.IsSuccessStatusCode) return (null, null);   // no releases yet, or offline
+
+            using JsonDocument doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync());
+            string tag = doc.RootElement.TryGetProperty("tag_name", out JsonElement t) ? t.GetString() ?? "" : "";
+            string url = doc.RootElement.TryGetProperty("html_url", out JsonElement u) ? u.GetString() ?? "" : "";
+            if (!Version.TryParse(tag.TrimStart('v', 'V'), out Version? latest)) return (null, null);
+
+            Version mine = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
+            // Compare on three parts; the build number is noise here.
+            var a = new Version(latest.Major, latest.Minor, Math.Max(latest.Build, 0));
+            var b = new Version(mine.Major, mine.Minor, Math.Max(mine.Build, 0));
+            return a > b ? (tag, url) : (null, null);
+        }
+        catch { return (null, null); }        // never let an update check break the app
+    }
+
+    private async Task NudgeIfOutOfDateAsync()
+    {
+        (string? tag, string? url) = await CheckForUpdateAsync(Repo);
+        if (tag is null) return;
+
+        PostToPage(JsonSerializer.Serialize(new { type = "update", version = tag, url }));
+        _lastNotificationUrl = url;
+        _tray.BalloonTipTitle = $"Tournament Tracker {tag} is out";
+        _tray.BalloonTipText = "Click to download the new version.";
+        _tray.BalloonTipIcon = ToolTipIcon.Info;
+        _tray.ShowBalloonTip(8000);
+    }
+
     private static Icon LoadAppIcon()
     {
         string? path = Environment.ProcessPath;
@@ -278,7 +328,8 @@ internal sealed class MainForm : Form
         // can fall back to this when localStorage is empty (fresh install, new exe,
         // cleared browser data).
         await core.AddScriptToExecuteOnDocumentCreatedAsync(
-            $"window.__restored = {ReadRestoreBlob()};");
+            $"window.__restored = {ReadRestoreBlob()};" +
+            $"window.__appVersion = {JsonSerializer.Serialize(CurrentVersion)};");
 
         if (_selfTest)
         {
@@ -296,6 +347,15 @@ internal sealed class MainForm : Form
         }
 
         core.Navigate($"https://{VirtualHost}/index.html");
+
+        if (!_selfTest)
+        {
+            // Once at startup, then daily for anyone who leaves it in the tray.
+            _ = NudgeIfOutOfDateAsync();
+            var daily = new System.Windows.Forms.Timer { Interval = 24 * 60 * 60 * 1000 };
+            daily.Tick += async (_, _) => await NudgeIfOutOfDateAsync();
+            daily.Start();
+        }
     }
 
     /// <summary>
@@ -346,6 +406,13 @@ internal sealed class MainForm : Form
             await Task.Delay(250);
         }
 
+        // Update check: prove it parses GitHub's API and compares versions. This
+        // repo may have no releases yet, so a repo that definitely has some is
+        // used for the parsing half.
+        (string? knownTag, _) = await CheckForUpdateAsync("cli/cli");
+        (string? ownTag, _) = await CheckForUpdateAsync(Repo);
+        string updateProbe = $"version={CurrentVersion} parsesReleases={(knownTag is not null ? "yes" : "no")} thisRepo={(ownTag ?? "up to date / none yet")}";
+
         // Run the app's own UTR pipeline end to end - fetch, normalise, junior
         // detection - against a fixed location, restoring the page's settings after.
         await core.ExecuteScriptAsync(
@@ -394,6 +461,7 @@ internal sealed class MainForm : Form
             + $",\"utrLive\":\"{utrProbe}\""
             + $",\"utrFlow\":{JsonSerializer.Serialize(utrFlow)}"
             + $",\"matchmakingRelay\":{JsonSerializer.Serialize(mmProbe)}"
+            + $",\"updateCheck\":{JsonSerializer.Serialize(updateProbe)}"
             + $",\"fullscreenOn\":{(fsOn ? "true" : "false")}"
             + $",\"fullscreenRestored\":{(fsOff ? "true" : "false")}"
             + $",\"navOk\":{(_navOk ? "true" : "false")}"
