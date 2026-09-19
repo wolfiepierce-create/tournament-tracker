@@ -2155,7 +2155,7 @@ function renderMM(){
     ].forEach(t=>ul.appendChild(el("li",null,t)));
     n.appendChild(ul); box.appendChild(n);
     const b=el("button","btn","I understand");
-    b.onclick=()=>{ mm.ack=true; saveMM(); renderMM(); checkInbox(); };
+    b.onclick=()=>{ mm.ack=true; saveMM(); renderMM(); checkInbox(); mmRefresh(); };
     box.appendChild(b);
     return;
   }
@@ -2364,6 +2364,7 @@ function setView(v){
     $("#whoami").textContent=[S.place||"Set your location", `within ${S.radius} mi`].join(" · ");
     renderMM(); renderBoard();
     if(mm.ack) mmRefresh();
+    else mmStatus("Read the note above and tap “I understand” to see players near you");
   } else render();
 }
 
