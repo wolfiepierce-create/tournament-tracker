@@ -88,6 +88,9 @@
    Base
    ============================================================ */
 *{box-sizing:border-box}
+/* Components set their own display (.field is flex), which would otherwise beat
+   the browser's built-in [hidden] rule and leave "hidden" controls on screen. */
+[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--bg); color:var(--ink);
