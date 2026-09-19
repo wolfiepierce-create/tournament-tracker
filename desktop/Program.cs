@@ -362,6 +362,21 @@ internal sealed class MainForm : Form
             await Task.Delay(250);
         }
 
+        // Matchmaking relay: publish to a throwaway topic and read it back.
+        await core.ExecuteScriptAsync(
+            "window.__mmProbe=null;(async()=>{try{const t=MM_PREFIX+'selftest-'+rid(6);" +
+            "await relayPost(t,{app:'jtt',v:1,type:'selftest'});" +
+            "let m=[],tries=0;while(tries++<6){await new Promise(r=>setTimeout(r,700));m=await relayRead([t],'5m');if(m.length)break;}" +
+            "window.__mmProbe='roundtrip='+(m.length===1&&m[0].body.type==='selftest')+' reads='+tries+' got='+m.length}" +
+            "catch(e){window.__mmProbe='ERR '+e.message}})()");
+        string mmProbe = "timeout";
+        for (int i = 0; i < 80; i++)
+        {
+            string v = await core.ExecuteScriptAsync("window.__mmProbe");
+            if (v != "null") { mmProbe = JsonSerializer.Deserialize<string>(v) ?? v; break; }
+            await Task.Delay(250);
+        }
+
         // Drive fullscreen exactly the way the user does: let the page see an F11
         // keypress and watch it come back through the bridge.
         await core.ExecuteScriptAsync(
@@ -378,6 +393,7 @@ internal sealed class MainForm : Form
         string report = inner.TrimEnd('}')
             + $",\"utrLive\":\"{utrProbe}\""
             + $",\"utrFlow\":{JsonSerializer.Serialize(utrFlow)}"
+            + $",\"matchmakingRelay\":{JsonSerializer.Serialize(mmProbe)}"
             + $",\"fullscreenOn\":{(fsOn ? "true" : "false")}"
             + $",\"fullscreenRestored\":{(fsOff ? "true" : "false")}"
             + $",\"navOk\":{(_navOk ? "true" : "false")}"
