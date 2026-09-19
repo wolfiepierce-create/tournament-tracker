@@ -1950,12 +1950,22 @@ function nearbyTopics(lat,lon){
   for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) out.push(cellTopic(a+i,b+j));
   return out;
 }
+/* Every relay call gets a deadline. Without one, a request that hangs — which
+   phones do when a home-screen app is sent to the background mid-request —
+   never settles, the "already refreshing" guard stays up, and the board quietly
+   stops updating for good. That was the "can't see anyone's posts" bug. */
+function relayFetch(url, opts){
+  const ac=new AbortController(), t=setTimeout(()=>ac.abort(), 15000);
+  return fetch(url, {...(opts||{}), cache:"no-store", signal:ac.signal})
+    .catch(e=>{ throw new Error(e.name==="AbortError" ? "the relay didn't answer in time" : e.message); })
+    .finally(()=>clearTimeout(t));
+}
 async function relayPost(topic, obj){
-  const r = await fetch(`${MM_RELAY}/${topic}`, { method:"POST", body: JSON.stringify(obj) });
+  const r = await relayFetch(`${MM_RELAY}/${topic}`, { method:"POST", body: JSON.stringify(obj) });
   if(!r.ok) throw new Error(`relay HTTP ${r.status}`);
 }
 async function relayRead(topics, since){
-  const r = await fetch(`${MM_RELAY}/${topics.join(",")}/json?poll=1&since=${since}`);
+  const r = await relayFetch(`${MM_RELAY}/${topics.join(",")}/json?poll=1&since=${since}`);
   if(!r.ok) throw new Error(`relay HTTP ${r.status}`);
   const out=[];
   for(const line of (await r.text()).split("\n")){
@@ -2010,7 +2020,12 @@ function courtSummary(c){
   return [c.n ? `${c.n} court${c.n>1?"s":""}` : null, c.lit ? "lights" : null, c.surface || null]
     .filter(Boolean).join(" · ");
 }
-const mapsLink = c => `https://www.google.com/maps/search/?api=1&query=${c.lat.toFixed(6)},${c.lon.toFixed(6)}`;
+/* Turn-by-turn directions on OpenStreetMap — the same map data the app uses —
+   starting from your ZIP area. No Google anywhere in Matchmaking. */
+const directionsLink = c => {
+  const from = S.lat!=null ? `${S.lat.toFixed(5)},${S.lon.toFixed(5)}` : "";
+  return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${from}%3B${c.lat.toFixed(6)},${c.lon.toFixed(6)}`;
+};
 async function lookupAddress(lat, lon){
   try{
     const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`);
@@ -2074,15 +2089,6 @@ nwr["name"]["amenity"~"^(school|college|university|community_centre)$"](around:$
   return venues;
 }
 
-async function photonFallback(mid){
-  const d=0.18, bbox=[mid.lon-d,mid.lat-d,mid.lon+d,mid.lat+d].map(x=>x.toFixed(4)).join(",");
-  const j=await (await fetch(`https://photon.komoot.io/api/?q=tennis%20courts&bbox=${bbox}&limit=25`)).json();
-  return (j.features||[]).filter(f=>f.geometry&&f.geometry.coordinates).map(f=>({
-    lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0], n:null, lit:false, surface:"",
-    name: clean(f.properties.name,60) || "Tennis courts",
-  }));
-}
-
 /* Courts don't move, so answers are kept for a month per area. */
 function courtCache(){ return LS.get("jtt.courts",{}); }
 function courtCacheSet(k,list){
@@ -2101,61 +2107,6 @@ async function venuesNear(mid, meters){
   return list;
 }
 
-/* The "median" court: the longer of the two drives as short as possible. */
-function rankForBoth(me, them, venues){
-  return venues.map(v=>{
-    const dMe=milesBetween(me.lat,me.lon,v.lat,v.lon), dThem=milesBetween(them.lat,them.lon,v.lat,v.lon);
-    return {...v, dMe:+dMe.toFixed(1), dThem:+dThem.toFixed(1), score:Math.max(dMe,dThem)+0.15*(dMe+dThem)};
-  }).sort((a,b)=>a.score-b.score)
-    /* Separate court sites can share the nearest named park; show each name once. */
-    .filter((v,i,arr)=>arr.findIndex(x=>x.name===v.name)===i);
-}
-async function findMedianCourts(me, them){
-  const mid={lat:(me.lat+them.lat)/2, lon:(me.lon+them.lon)/2};
-  const sepMi=milesBetween(me.lat,me.lon,them.lat,them.lon);
-  const start=Math.max(3000, sepMi*1609*0.35);
-  let venues=[];
-  try{
-    for(const m of [start, start*2.2, Math.max(start*4, 25000)]){
-      venues=await venuesNear(mid, m);
-      if(venues.length>=3) break;
-    }
-  }catch(e){ /* OpenStreetMap service unavailable — go straight to the fallback */ }
-  if(!venues.length){ try{ venues=await photonFallback(mid); }catch(e){} }
-  return { mid, list: rankForBoth(me, them, venues).slice(0,4) };
-}
-
-/* ---------- Google Maps links ---------- */
-const SHORT_MAPS = /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps)\//i;
-function parseMapsUrl(u){
-  let s; try{ s=decodeURIComponent(u); }catch(e){ s=u; }
-  const num = "(-?\\d{1,3}\\.\\d+)";
-  const pick = re => { const m=re.exec(s); return m ? {lat:+m[1], lon:+m[2]} : null; };
-  const at = pick(new RegExp("!3d"+num+"!4d"+num))                    // the place itself
-          || pick(new RegExp("/(?:search|place|dir)/"+num+",[\\s+]*"+num))   // what share links land on
-          || pick(new RegExp("[?&](?:q|query|ll|center|destination)="+num+",[\\s+]*"+num))
-          || pick(new RegExp("@"+num+","+num));                        // the map view
-  if(!at || !okNum(at.lat,-90,90) || !okNum(at.lon,-180,180)) return null;
-  const nm=/\/place\/([^/@?]+)/.exec(s);
-  return { ...at, name: nm ? clean(nm[1].replace(/\+/g," "),60) : "" };
-}
-async function courtFromMapsLink(u){
-  u=(u||"").trim();
-  if(!/^https?:\/\//i.test(u)) throw new Error("Paste the whole link, starting with https://");
-  if(SHORT_MAPS.test(u)){
-    /* Short share links have to be followed to find the place, and browsers
-       aren't allowed to — the desktop app's host can. */
-    if(!HOST) throw new Error("Short share links (maps.app.goo.gl) only work in the desktop app. Open the link, then copy the full address from the address bar — or drop a pin on the map.");
-    const r=await fetch(`/resolve?u=${encodeURIComponent(u)}`);
-    const j=await r.json();
-    if(!j.url) throw new Error("Couldn't follow that link");
-    u=j.url;
-  }
-  const hit=parseMapsUrl(u);
-  if(!hit) throw new Error("That link doesn't include a location. Open the place in Google Maps and copy the link again.");
-  return hit;
-}
-
 /* ---------- my posts ---------- */
 async function publishPost(p){
   await relayPost(cellTopic(...cellOf(S.lat,S.lon)), {
@@ -2172,6 +2123,7 @@ async function goLive(){
   if(!name){ toast("Add a display name first","✋"); return; }
   if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
   if(d.when==="at" && (!okTime(d.time) || new Date(d.time).getTime()<Date.now())){ toast("Pick a date and time in the future","✋"); return; }
+  if(!d.court){ toast("Pin the court you'll play at — tap 📍 Choose a court","📍",4600); return; }
   if(mm.posts.length>=MM_MAX_POSTS){ toast(`You can have up to ${MM_MAX_POSTS} posts at once — take one down first`,"✋",4200); return; }
   const note=stripContacts(clean(d.note,140));
   if(note!==clean(d.note,140)) toast("Contact details were removed from your note — arrange things in the app","🔒",5200);
@@ -2210,23 +2162,32 @@ async function mmRefresh(){
       byId.set(p.id, p);                           // later re-posts replace earlier
     }
     const now=Date.now();
-    mmBoard=[...byId.values()].filter(p =>
-      !gone.has(p.id) && p.dev!==mm.device && p.exp>now && !mm.blocked.includes(p.dev)
-    ).map(p=>({...p, miles:+milesBetween(S.lat,S.lon,p.lat,p.lon).toFixed(1)}))
-     .filter(p=>p.miles<=S.radius)
-     .sort((a,b)=>a.miles-b.miles);
+    const live=[...byId.values()].filter(p=>!gone.has(p.id) && p.dev!==mm.device && p.exp>now)
+      .map(p=>({...p, miles:+milesBetween(S.lat,S.lon,p.lat,p.lon).toFixed(1)}));
+    const hidden = live.filter(p=>mm.blocked.includes(p.dev));
+    const far    = live.filter(p=>!mm.blocked.includes(p.dev) && p.miles>S.radius);
+    mmBoard = live.filter(p=>!mm.blocked.includes(p.dev) && p.miles<=S.radius).sort((a,b)=>a.miles-b.miles);
     renderBoard();
-    mmStatus(mmBoard.length
-      ? `${mmBoard.length} post${mmBoard.length===1?"":"s"} within ${S.radius} mi from players who want to play`
-      : `No one within ${S.radius} mi has posted in the last 12 hours`);
+
+    /* Say why posts aren't shown, so an empty board is never a mystery. */
+    const why=[];
+    if(far.length) why.push(`${far.length} more beyond your ${S.radius}-mi max drive (nearest ${Math.min(...far.map(p=>p.miles))} mi)`);
+    if(hidden.length) why.push(`${hidden.length} from players you hid`);
+    const time=new Date().toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+    mmStatus((mmBoard.length
+      ? `${mmBoard.length} post${mmBoard.length===1?"":"s"} within ${S.radius} mi`
+      : `No one within ${S.radius} mi has posted in the last 12 hours`)
+      + (why.length ? ` · ${why.join(" · ")}` : "") + ` · updated ${time}`,
+      null, mm.blocked.length ? { label:"Unhide players", run:()=>{ mm.blocked=[]; saveMM(); mmRefresh(); toast("Everyone's visible again","✓"); } } : null);
   }catch(e){
     mmStatus(`Couldn't reach the matchmaking relay (${e.message}). Tap Refresh to retry.`);
   }finally{ boardBusy=false; }
 }
-function mmStatus(text,mode){
+function mmStatus(text,mode,action){
   const b=$("#mmStatus"); if(!b) return; b.innerHTML="";
   b.appendChild(mode==="load" ? el("span","spin") : el("span","pip"));
   b.appendChild(el("span",null,text));
+  if(action){ const a=el("button","act",action.label); a.onclick=action.run; b.appendChild(a); }
 }
 
 /* ---------- invites, answers, cancellations ---------- */
@@ -2351,7 +2312,7 @@ function matchCalendarUrl(withName, court, time){
   return "https://calendar.google.com/calendar/render?"+new URLSearchParams({
     action:"TEMPLATE", text:`Tennis vs ${withName}`, dates:`${z(s)}/${z(e)}`,
     location: court.address ? `${court.name}, ${court.address}` : `${court.name} (${court.lat.toFixed(5)}, ${court.lon.toFixed(5)})`,
-    details:[`Arranged through Matchmaking.`, courtSummary(court), `Directions: ${mapsLink(court)}`].filter(Boolean).join("\n"),
+    details:[`Arranged through Matchmaking.`, courtSummary(court), `Map & directions: ${directionsLink(court)}`].filter(Boolean).join("\n"),
   });
 }
 
@@ -2409,7 +2370,7 @@ function renderMMNow(){
 
   if(!mm.ack){
     box.appendChild(el("h2",null,"Find someone to hit with"));
-    box.appendChild(el("p","lede","Post when you want to play and it shows up for players within your max-drive radius. Pick a court yourself, or let the app find one roughly halfway between you."));
+    box.appendChild(el("p","lede","Post when you want to play and it shows up for players within your max-drive radius. You choose the court; anyone nearby can see it on the map and invite you to play there."));
     const n=el("div","notice"+(minor?" warn":""));
     n.appendChild(el("strong",null,"Before you post"));
     const ul=el("ul");
@@ -2446,7 +2407,7 @@ function renderMMNow(){
       const l2=[p.court ? `At ${courtLines(p.court)}` : "Court to agree", p.note ? `“${p.note}”` : ""].filter(Boolean).join(" · ");
       t.appendChild(el("div","s",l2));
       r.appendChild(t);
-      if(p.court) r.appendChild(linkAct("Map", mapsLink(p.court)));
+      if(p.court) r.appendChild(mapButton(p.court, "Your court"));
       r.appendChild(confirmButton("Take down","Tap to confirm",()=>takeDown(p.id)));
       s.appendChild(r);
     }
@@ -2473,7 +2434,7 @@ function renderMMNow(){
   whenS.addEventListener("change",()=>{ tw.hidden = whenS.value!=="at"; if(whenS.value==="at" && !okTime(d.time)){ d.time=ti.value; } });
 
   /* court (optional) */
-  const cw=el("div","field wide"); cw.appendChild(el("label",null,"Court (optional)"));
+  const cw=el("div","field wide"); cw.appendChild(el("label",null,"Court"));
   const cr=el("div","court-pick");
   if(d.court){
     const chip=el("div","court-chip");
@@ -2484,8 +2445,8 @@ function renderMMNow(){
     const ch=el("button","act","Change"); ch.onclick=()=>openCourtPicker(); cr.appendChild(ch);
     const rm=el("button","act","Remove"); rm.onclick=()=>{ d.court=null; saveMM(); renderMMNow(); }; cr.appendChild(rm);
   } else {
-    const pick=el("button","act","📍 Pin a court on the map"); pick.onclick=()=>openCourtPicker(); cr.appendChild(pick);
-    cr.appendChild(el("span","fine","Leave it empty and the other player can suggest one halfway between you."));
+    const pick=el("button","act primary","📍 Choose a court"); pick.onclick=()=>openCourtPicker(); cr.appendChild(pick);
+    cr.appendChild(el("span","fine","You pick where you'll play. Players who invite you can see it on the map."));
   }
   cw.appendChild(cr); f.appendChild(cw);
 
@@ -2516,7 +2477,7 @@ function renderMMNow(){
       const r=el("div","inv ok"), t=el("div","txt");
       const l1=el("div"); l1.appendChild(el("b",null,fmtWhen(m.time))); l1.appendChild(document.createTextNode(` · vs ${m.with}`)); t.appendChild(l1);
       t.appendChild(el("div","s",courtLines(m.court))); r.appendChild(t);
-      r.appendChild(linkAct("Directions", mapsLink(m.court)));
+      r.appendChild(mapButton(m.court, `Match vs ${m.with}`));
       const cu=matchCalendarUrl(m.with,m.court,m.time); if(cu) r.appendChild(linkAct("Add to calendar", cu, "primary"));
       r.appendChild(confirmButton("Cancel","Tap to cancel match",()=>cancelMatch(m.iid)));
       s.appendChild(r);
@@ -2535,7 +2496,7 @@ function renderMMNow(){
       const dMe=S.lat!=null ? milesBetween(S.lat,S.lon,v.court.lat,v.court.lon).toFixed(1) : null;
       t.appendChild(el("div","s",`${fmtWhen(v.time)} · ${courtLines(v.court)}${dMe?` · ${dMe} mi from you`:""}`));
       r.appendChild(t);
-      r.appendChild(linkAct("Map", mapsLink(v.court)));
+      r.appendChild(mapButton(v.court, `${v.from.name}'s invite`));
       const no=el("button","act","Decline"); no.onclick=()=>answerInvite(iid,false); r.appendChild(no);
       const yes=el("button","act primary","Accept"); yes.onclick=()=>answerInvite(iid,true); r.appendChild(yes);
       s.appendChild(r);
@@ -2640,10 +2601,15 @@ function playerCard(p,idx){
   if(mmOpen===p.id){
     const close=el("button","act","Close"); close.onclick=()=>{ mmOpen=null; renderBoardNow(); }; f.appendChild(close);
   } else {
-    const b=el("button","act primary", mine.length ? "Invite for another time" : p.court ? "Invite to play here" : "Find median court");
-    b.onclick=()=>openInvite(p);
-    f.appendChild(b);
-    if(p.court) f.appendChild(linkAct("Map", mapsLink(p.court)));
+    if(p.court){
+      const b=el("button","act primary", mine.length ? "Invite for another time" : "Invite to play here");
+      b.onclick=()=>openInvite(p);
+      f.appendChild(b);
+      f.appendChild(mapButton(p.court, `${p.name}'s court`));
+    } else {
+      /* Only posts from older versions of the app can lack a court. */
+      f.appendChild(el("span","fine","No court picked yet"));
+    }
   }
   c.appendChild(f);
 
@@ -2651,83 +2617,60 @@ function playerCard(p,idx){
   return c;
 }
 
-/* The invite panel: their pinned court first (if any), fair "median" courts
-   on request (or straight away when they didn't pin one), then a time. */
-async function openInvite(p){
+/* The invite panel. The poster chose the court, so inviting is simply
+   agreeing to play there and proposing a time (pre-filled from their post). */
+function openInvite(p){
   if(!clean(mm.draft.name,24)){ toast("Fill in your display name above first — it goes on the invite","✋",4200); return; }
   if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
+  if(!p.court){ toast(`${p.name} hasn't picked a court yet`,"✋"); return; }
   mmOpen=p.id;
-  const st = mmFind[p.id] = { state:"ok", list:[], chosen:0, time:defaultTime(p.when,p.time) };
-  if(p.court) st.list=[{...p.court, theirs:true, ...rankForBoth({lat:S.lat,lon:S.lon},{lat:p.lat,lon:p.lon},[p.court])[0]}];
+  mmFind[p.id]={ time:defaultTime(p.when,p.time) };
   renderBoardNow();
-  if(!p.court) findMedian(p);
-}
-async function findMedian(p){
-  const st=mmFind[p.id]; if(!st) return;
-  st.state="load"; renderBoardNow();
-  try{
-    const r=await findMedianCourts({lat:S.lat,lon:S.lon},{lat:p.lat,lon:p.lon});
-    const extra=r.list.filter(v=>!st.list.some(x=>x.name===v.name));
-    st.list=[...st.list, ...extra]; st.mid=r.mid; st.state="ok"; st.searched=true;
-  }catch(e){ st.state="ok"; st.searched=true; st.failed=true; }
-  if(mmOpen===p.id) renderBoardNow();
 }
 
 function invitePanel(p){
-  const st=mmFind[p.id]||{state:"load",list:[]}, w=el("div","courts");
-  st.list.forEach((v,i)=>{
-    const row=el("div","court"); row.setAttribute("aria-pressed", i===st.chosen);
-    row.onclick=()=>{ st.chosen=i; renderBoardNow(); };
-    const g=el("div","grow");
-    g.appendChild(el("div","n", (v.theirs ? "Their court · " : "") + v.name));
-    const sub=[`${v.dMe} mi for you · ${v.dThem} mi for ${p.name}`, courtSummary(v)].filter(Boolean).join(" · ");
-    g.appendChild(el("div","d",sub));
-    row.appendChild(g);
-    const m=el("a",null,"Map"); m.href=mapsLink(v); m.target="_blank"; m.rel="noopener"; m.onclick=e=>e.stopPropagation();
-    row.appendChild(m);
-    w.appendChild(row);
-  });
+  const st=mmFind[p.id] || (mmFind[p.id]={ time:defaultTime(p.when,p.time) });
+  const w=el("div","courts");
 
-  if(st.state==="load"){
-    const l=el("div","statusline mm-status"); l.appendChild(el("span","spin"));
-    l.appendChild(el("span",null,"Finding public courts between you… the free map service can take up to half a minute"));
-    w.appendChild(l);
-  } else if(!st.searched){
-    const more=el("button","act","Suggest a court halfway between us"); more.onclick=()=>findMedian(p);
-    w.appendChild(more);
-  } else if(st.failed || !st.list.length){
-    w.appendChild(el("div","notice","The court map service isn't answering right now. Search the map and pin one instead, or try again in a minute."));
-    const mid = st.mid || {lat:(S.lat+p.lat)/2, lon:(S.lon+p.lon)/2};
-    w.appendChild(linkAct("Search the map for courts", `https://www.google.com/maps/search/tennis+courts/@${mid.lat.toFixed(5)},${mid.lon.toFixed(5)},13z`));
-  }
+  const row=el("div","court"); row.setAttribute("aria-pressed","true");
+  const g=el("div","grow");
+  g.appendChild(el("div","n",p.court.name));
+  const dMe=milesBetween(S.lat,S.lon,p.court.lat,p.court.lon).toFixed(1);
+  g.appendChild(el("div","d",[`${dMe} mi from you`, courtSummary(p.court), p.court.address].filter(Boolean).join(" · ")));
+  row.appendChild(g);
+  const see=el("button","act","View on map"); see.onclick=e=>{ e.stopPropagation(); openMapView(p.court, `${p.name}'s court`); };
+  row.appendChild(see);
+  w.appendChild(row);
 
-  if(st.list.length){
-    const a=el("div","mm-actions");
-    const tf=el("div","field"); tf.appendChild(el("label",null,"When"));
-    const ti=el("input"); ti.type="datetime-local"; ti.value=st.time; ti.min=localStamp(new Date());
-    ti.addEventListener("input",()=>{ st.time=ti.value; });
-    tf.appendChild(ti); a.appendChild(tf);
-    const send=el("button","btn","Send invite");
-    send.onclick=async()=>{
-      st.time=ti.value;
-      if(!okTime(st.time) || new Date(st.time).getTime()<Date.now()){ toast("Pick a date and time in the future","✋"); return; }
-      send.disabled=true; send.textContent="Sending…";
-      try{
-        if(await sendInvite(p, st.list[st.chosen], st.time)){
-          toast(`Invite sent to ${p.name} — you'll be told when they answer`,"📨",4600);
-          mmOpen=null; renderBoardNow(); renderMMNow();
-          return;
-        }
-      }catch(e){ toast("Couldn't send the invite — try again","⚠️"); }
-      send.disabled=false; send.textContent="Send invite";
-    };
-    a.appendChild(send);
-    w.appendChild(a);
-  }
+  const a=el("div","mm-actions");
+  const tf=el("div","field"); tf.appendChild(el("label",null,"When"));
+  const ti=el("input"); ti.type="datetime-local"; ti.value=st.time; ti.min=localStamp(new Date());
+  ti.addEventListener("input",()=>{ st.time=ti.value; });
+  tf.appendChild(ti); a.appendChild(tf);
+  const send=el("button","btn","Send invite");
+  send.onclick=async()=>{
+    st.time=ti.value;
+    if(!okTime(st.time) || new Date(st.time).getTime()<Date.now()){ toast("Pick a date and time in the future","✋"); return; }
+    send.disabled=true; send.textContent="Sending…";
+    try{
+      if(await sendInvite(p, p.court, st.time)){
+        toast(`Invite sent to ${p.name} — you'll be told when they answer`,"📨",4600);
+        mmOpen=null; renderBoardNow(); renderMMNow();
+        return;
+      }
+    }catch(e){ toast("Couldn't send the invite — try again","⚠️"); }
+    send.disabled=false; send.textContent="Send invite";
+  };
+  a.appendChild(send);
+  w.appendChild(a);
   return w;
 }
 
-/* ---------- court picker (map) ---------- */
+/* ---------- the in-app map ---------- */
+/* One map for everything: choosing your court, and looking at the court
+   someone else offered. OpenStreetMap tiles (labelled, free, no key), softened
+   by CSS to suit the app and inverted in dark mode; Esri's street map takes
+   over if they ever fail to load. No Google anywhere. */
 let leafletReady=null;
 function loadLeaflet(){
   if(window.L) return Promise.resolve();
@@ -2745,41 +2688,97 @@ function loadLeaflet(){
 }
 const isDark = () => S.theme==="dark" || (S.theme!=="light" && matchMedia("(prefers-color-scheme: dark)").matches);
 
+function makeMap(box, lat, lon, zoom){
+  box.classList.toggle("dark", isDark());
+  const map=L.map(box,{zoomControl:true, attributionControl:true}).setView([lat,lon], zoom);
+  let fellBack=false;
+  const osm=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+  }).addTo(map);
+  osm.on("tileerror",()=>{
+    if(fellBack) return; fellBack=true;
+    map.removeLayer(osm);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{
+      maxZoom:19, attribution:"Tiles &copy; Esri",
+    }).addTo(map);
+  });
+  setTimeout(()=>map.invalidateSize(),120);
+  return map;
+}
+const courtPin = (lat,lon) => L.circleMarker([lat,lon],{radius:11,color:"#fff",weight:3,fillColor:"#ff375f",fillOpacity:1});
+const homeDot  = (lat,lon) => L.circleMarker([lat,lon],{radius:7,color:"#fff",weight:2,fillColor:"#0a84ff",fillOpacity:.9});
+
+function mapSheet(title, lede){
+  const scrim=el("div","scrim"), m=el("div","sheet map-sheet");
+  m.appendChild(el("h2",null,title));
+  if(lede) m.appendChild(el("p","lede",lede));
+  const mapBox=el("div","map"); m.appendChild(mapBox);
+  scrim.appendChild(m); document.body.appendChild(scrim);
+  const api={ scrim, sheet:m, mapBox, map:null,
+    close(){ try{ api.map && api.map.remove(); }catch(e){} scrim.remove(); } };
+  scrim.onclick=e=>{ if(e.target===scrim) api.close(); };
+  document.addEventListener("keydown", function esc(ev){ if(ev.key==="Escape"){ api.close(); document.removeEventListener("keydown",esc); } });
+  return api;
+}
+
+/* A small "Map" button that opens any court in the app. */
+function mapButton(court, title){
+  const b=el("button","act","Map");
+  b.onclick=e=>{ e.stopPropagation(); openMapView(court, title); };
+  return b;
+}
+
+/* Look at a court: its pin, your ZIP area for scale, the details, and
+   turn-by-turn directions on OpenStreetMap if you want them. */
+async function openMapView(court, title){
+  const s=mapSheet(title || court.name, null);
+  const info=el("div","pick-card");
+  info.appendChild(el("div","n",court.name));
+  const dMe = S.lat!=null ? milesBetween(S.lat,S.lon,court.lat,court.lon).toFixed(1) : null;
+  const sub=[dMe ? `${dMe} mi from you` : null, courtSummary(court), court.address].filter(Boolean).join(" · ");
+  if(sub) info.appendChild(el("div","d",sub));
+  s.sheet.appendChild(info);
+  const foot=el("div","sheet-foot");
+  const dir=el("a","btn-plain","Directions"); dir.href=directionsLink(court); dir.target="_blank"; dir.rel="noopener";
+  const done=el("button","btn","Done"); done.onclick=()=>s.close();
+  foot.appendChild(dir); foot.appendChild(done); s.sheet.appendChild(foot);
+
+  try{ await loadLeaflet(); }
+  catch(e){ s.mapBox.hidden=true; info.appendChild(el("div","d","The map couldn't load right now — Directions still works.")); return; }
+  const map = s.map = makeMap(s.mapBox, court.lat, court.lon, 16);
+  courtPin(court.lat,court.lon).addTo(map).bindTooltip(court.name,{permanent:true,direction:"top",offset:[0,-10]});
+  if(S.lat!=null && milesBetween(S.lat,S.lon,court.lat,court.lon) < 60){
+    homeDot(S.lat,S.lon).addTo(map).bindTooltip("Your area");
+    map.fitBounds(L.latLngBounds([[court.lat,court.lon],[S.lat,S.lon]]).pad(0.25), {maxZoom:16});
+  }
+}
+
+/* Choose your court: tap a blue dot (a mapped public court) or anywhere to
+   drop your own pin. */
 async function openCourtPicker(){
   if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
-  const scrim=el("div","scrim"), m=el("div","sheet map-sheet");
-  m.appendChild(el("h2",null,"Pin a court"));
-  m.appendChild(el("p","lede","Tap a blue dot for a mapped public court, or tap anywhere to drop your own pin. You can also paste a Google Maps link."));
-  const mapBox=el("div","map"); m.appendChild(mapBox);
-  const status=el("div","statusline mm-status"); m.appendChild(status);
+  const s=mapSheet("Choose a court","Tap a blue dot for a mapped public court, or tap anywhere on the map to drop your own pin.");
+  const status=el("div","statusline mm-status");
   const setStatus2=(t,load)=>{ status.innerHTML=""; status.appendChild(load?el("span","spin"):el("span","pip")); status.appendChild(el("span",null,t)); };
+  const again=el("button","act map-again","Search this area");
+  s.sheet.appendChild(again); s.sheet.appendChild(status);
 
-  const linkRow=el("div","link-row");
-  const li=inp("","Paste a Google Maps link"); li.inputMode="url";
-  const lb=el("button","act","Use link");
-  linkRow.appendChild(li); linkRow.appendChild(lb); m.appendChild(linkRow);
-
-  const card=el("div","pick-card"); card.hidden=true; m.appendChild(card);
+  const card=el("div","pick-card"); card.hidden=true; s.sheet.appendChild(card);
   const nameF=el("div","field"); nameF.appendChild(el("label",null,"Name shown to players")); const nameI=inp("","e.g. Memorial Park courts",60); nameF.appendChild(nameI);
 
   const foot=el("div","sheet-foot");
   const cancel=el("button","btn-plain","Cancel");
   const use=el("button","btn","Use this court"); use.disabled=true;
-  foot.appendChild(cancel); foot.appendChild(use); m.appendChild(foot);
-  scrim.appendChild(m); document.body.appendChild(scrim);
-  const close=()=>{ try{ map && map.remove(); }catch(e){} scrim.remove(); };
-  cancel.onclick=close;
-  scrim.onclick=e=>{ if(e.target===scrim) close(); };
+  foot.appendChild(cancel); foot.appendChild(use); s.sheet.appendChild(foot);
+  cancel.onclick=()=>s.close();
 
-  let map=null, chosen=null, chosenMarker=null;
+  let chosen=null, chosenMarker=null;
   const dots=[];
-  const choose = async (c, fromMap) => {
+  const choose = async (c) => {
     chosen={ name:c.name||"", lat:c.lat, lon:c.lon, n:c.n||null, lit:!!c.lit, surface:c.surface||"", address:"" };
     if(chosenMarker) chosenMarker.remove();
-    if(map){
-      chosenMarker=L.circleMarker([c.lat,c.lon],{radius:11,color:"#fff",weight:3,fillColor:"#ff375f",fillOpacity:1}).addTo(map);
-      if(!fromMap) map.setView([c.lat,c.lon], Math.max(map.getZoom(),15));
-    }
+    if(s.map) chosenMarker=courtPin(c.lat,c.lon).addTo(s.map);
     card.hidden=false; card.innerHTML="";
     card.appendChild(el("div","n", chosen.name || "Pinned spot"));
     const sub=el("div","d", [courtSummary(chosen), "looking up the address…"].filter(Boolean).join(" · "));
@@ -2798,43 +2797,18 @@ async function openCourtPicker(){
     if(!chosen) return;
     const name=clean(nameI.value,60) || chosen.name || "Tennis courts";
     mm.draft.court=parseCourt({...chosen, name});
-    saveMM(); close(); renderMMNow();
+    saveMM(); s.close(); renderMMNow();
     toast(`Court set: ${name}`,"📍");
-  };
-  lb.onclick=async()=>{
-    lb.disabled=true; setStatus2("Reading the link…",true);
-    try{
-      const hit=await courtFromMapsLink(li.value);
-      await choose({name:hit.name, lat:hit.lat, lon:hit.lon}, false);
-      setStatus2("Got it — check the name, then tap Use this court");
-    }catch(e){ setStatus2(e.message); }
-    lb.disabled=false;
   };
 
   setStatus2("Loading the map…",true);
   try{ await loadLeaflet(); }
-  catch(e){ mapBox.hidden=true; setStatus2("The map couldn't load — paste a Google Maps link instead"); return; }
+  catch(e){ s.mapBox.hidden=true; setStatus2("The map couldn't load — check your connection and try again"); return; }
 
-  map=L.map(mapBox,{zoomControl:true, attributionControl:true}).setView([S.lat,S.lon],13);
-  /* OpenStreetMap's own tiles: labelled, free with attribution, no key. (CARTO's
-     "free" basemaps now stamp API KEY REQUIRED across every tile.) They're
-     softened to near-grey by CSS to suit the app, and inverted in dark mode.
-     If they ever fail to load, Esri's street map takes over. */
-  mapBox.classList.toggle("dark", isDark());
-  let fellBack=false;
-  const osm=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
-  }).addTo(map);
-  osm.on("tileerror",()=>{
-    if(fellBack) return; fellBack=true;
-    map.removeLayer(osm);
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",{
-      maxZoom:19, attribution:"Tiles &copy; Esri",
-    }).addTo(map);
-  });
-  setTimeout(()=>map.invalidateSize(),120);
-  map.on("click", e=>choose({name:"", lat:e.latlng.lat, lon:e.latlng.lng}, true));
+  const start = mm.draft.court || {lat:S.lat, lon:S.lon};
+  const map = s.map = makeMap(s.mapBox, start.lat, start.lon, mm.draft.court ? 16 : 13);
+  if(mm.draft.court) choose(mm.draft.court);
+  map.on("click", e=>choose({name:"", lat:e.latlng.lat, lon:e.latlng.lng}));
 
   const loadDots=async()=>{
     const c=map.getCenter(), b=map.getBounds();
@@ -2842,19 +2816,18 @@ async function openCourtPicker(){
     setStatus2("Finding public courts on the map…",true);
     let list;
     try{ list=await venuesNear({lat:c.lat, lon:c.lng}, radius); }
-    catch(e){ setStatus2("The court map service is busy — tap the map to drop a pin, or try Search this area again"); return; }
+    catch(e){ setStatus2("The court finder is busy — tap the map to drop a pin, or try Search this area again"); return; }
     dots.forEach(d=>d.remove()); dots.length=0;
     for(const v of list){
       const d=L.circleMarker([v.lat,v.lon],{radius:7,color:"#fff",weight:2,fillColor:"#0a84ff",fillOpacity:.95}).addTo(map);
       d.bindTooltip(v.name + (v.n>1?` · ${v.n} courts`:""));
-      d.on("click", ev=>{ L.DomEvent.stopPropagation(ev); choose(v, true); });
+      d.on("click", ev=>{ L.DomEvent.stopPropagation(ev); choose(v); });
       dots.push(d);
     }
     setStatus2(list.length ? `${list.length} public court site${list.length===1?"":"s"} here — tap one, or drop your own pin`
                            : "No mapped courts here — tap the map to drop a pin");
   };
-  const again=el("button","act map-again","Search this area"); again.onclick=loadDots;
-  m.insertBefore(again, status);
+  again.onclick=loadDots;
   loadDots();
 }
 

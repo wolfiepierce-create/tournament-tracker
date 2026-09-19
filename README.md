@@ -156,24 +156,32 @@ The **Tournaments | Matchmaking** switch at the top of the dashboard opens it.
 1. **Post "Want to play"** — display name, **skill** (Unranked, Beginner, Intermediate,
    Advanced, Tournament, or UTR 1–16.5), singles/doubles, **when** (today, tomorrow, this
    weekend, weekday evenings, flexible, or a specific date and time), an optional note, and
-   optionally **a court**. You can have **up to five posts live at once** — one per time you
-   could play.
-2. **Pin a court (optional).** *📍 Pin a court on the map* opens a map of your area with the
-   public courts from OpenStreetMap as blue dots — tap one, or tap anywhere to drop your own
-   pin. Or paste a Google Maps link. The app looks up the address and passes the details on:
-   other players see the court's name, how many courts, lights, surface and address.
-3. **Someone invites you.** If you pinned a court they tap *Invite to play here*; if not,
-   *Find median court* ranks public courts by fairness — the longer of the two drives as
-   short as possible (e.g. *1.3 mi for you · 1.4 mi for them*). They pick a time and send.
-   A player can send more than one invite for different times.
-4. **Accept or Decline.** Confirmed matches list the time, court details, Directions and
-   Add to calendar.
+   **the court you'll play at**. You can have **up to five posts live at once** — one per
+   time you could play.
+2. **Choose the court.** *📍 Choose a court* opens the in-app map with the public courts from
+   OpenStreetMap as blue dots — tap one, or tap anywhere to drop your own pin, and give it a
+   name. The poster always decides where; the app looks up the address and shows the other
+   player the name, how many courts, lights, surface and address.
+3. **Someone invites you.** They see your court on your card, can tap **Map** to look at it
+   in the app, and tap **Invite to play here** — the only thing they choose is the time
+   (pre-filled from your post). A player can send more than one invite for different times.
+4. **Accept or Decline.** Confirmed matches show the time, court, **Map**, and Add to calendar.
 5. **Cancel** a confirmed match, or **Withdraw** an invite you sent — two taps, so a stray tap
    can't do it. The other player is told straight away.
 
-Tested end to end both ways with a second player: two live time slots, a pinned court,
-invites to each, accept, decline, cancel from either side, withdraw, and each player's
-phone alert.
+**Map** anywhere in Matchmaking — on a card, an invite, a match, or your own post — opens the
+court on the in-app map, with your area marked for scale and a **Directions** button that
+routes you there on OpenStreetMap. There's no Google Maps in Matchmaking any more.
+
+### When the board looks empty
+
+The line under *Players near you* always says why posts aren't showing — for example
+*"No one within 25 mi · 2 more beyond your 25-mi max drive (nearest 31 mi)"*, or
+*"1 from players you hid"* with an **Unhide players** button — and when it last updated.
+
+A phone that sent the app to the background in the middle of a refresh used to leave that
+request hanging forever, and the board then silently never refreshed again. Every relay
+request now gives up after 15 seconds, so the next refresh always goes through.
 
 ### Notifications
 
@@ -188,27 +196,19 @@ Matchmaking panel, tap *Open your alert channel*, and subscribe in ntfy. Every i
 answer and cancellation then arrives as a normal phone notification. Keep your channel name
 to yourself — anyone who has it can read your alerts.
 
-### Google Maps links
-
-Paste the link Google Maps gives you. Full links (`google.com/maps/...`) work everywhere.
-**Short share links (`maps.app.goo.gl/...`) — what the phone's *Share* button produces — only
-work in the desktop app**, because following them needs its built-in host; on the web
-version, open the link and copy the full address from the address bar instead, or just drop
-a pin on the map.
-
 ### What gets shared — and what never does
 
 A post carries your **display name, skill, format, availability, note, chosen court, and
 your ZIP code's centre point** (not your location — everyone in 07928 shares the same point).
 It never carries your address, age, birth year, phone or email. Phone numbers, emails,
 links and social handles typed into a note are replaced with *[removed]* before it's
-sent, and again on the receiving side. Court and time are agreed inside the app, so no
-one needs to swap contact details.
+sent, and again on the receiving side. The time is agreed inside the app, so no one needs
+to swap contact details.
 
 Before first use there's a short notice; if your birth year says you're under 18 it
 asks you to play only with a parent or guardian's OK and to bring them.
 
-**✕** on a player's card hides them from you for good.
+**✕** on a player's card hides them from you; *Unhide players* brings everyone back.
 
 ### How it works (and its limits)
 
@@ -224,10 +224,11 @@ message relay with no account needed. That means:
   tray in the desktop app.
 - **Your desktop and phone are separate players.** Each device has its own posts and inbox;
   an invite to a post you made on your PC arrives on your PC.
-- **Finding courts can take up to ~30 seconds**, because the free OpenStreetMap service is
-  often busy. Answers are cached for a month per area. If it's down, the app falls back to a
-  simpler search, or offers a map search centred between you.
-- **Map tiles come from OpenStreetMap**, which asks for light, personal use — fine for this.
+- **You only see posts inside your *Max drive* radius**, measured between ZIP areas. Two
+  people who both want to see each other each need the other within their own radius.
+- **The blue court dots come from OpenStreetMap's free court finder**, which is sometimes
+  busy; the picker says so, and you can still drop a pin anywhere. Results are cached for a
+  month per area. Map tiles are OpenStreetMap's, which asks for light, personal use.
 - **Only people using this app** can see posts. There's no moderation beyond hiding a
   player, so it suits a group you share the link with better than the open internet.
 

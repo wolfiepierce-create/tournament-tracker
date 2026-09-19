@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
@@ -179,37 +179,6 @@ internal sealed class MainForm : Form
             "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
     }
 
-    private static async Task<CoreWebView2WebResourceResponse> ResolveMapsLinkAsync(
-        CoreWebView2Environment env, string target)
-    {
-        string? final = null;
-        // Only Google's own short-link hosts - this is not a general URL fetcher.
-        if (Uri.TryCreate(target, UriKind.Absolute, out Uri? u) && u.Scheme == Uri.UriSchemeHttps &&
-            (u.Host.Equals("maps.app.goo.gl", StringComparison.OrdinalIgnoreCase) ||
-             (u.Host.Equals("goo.gl", StringComparison.OrdinalIgnoreCase) &&
-              u.AbsolutePath.StartsWith("/maps", StringComparison.OrdinalIgnoreCase))))
-        {
-            try
-            {
-                using var req = new HttpRequestMessage(HttpMethod.Get, u);
-                using HttpResponseMessage r = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
-                Uri? landed = r.RequestMessage?.RequestUri;
-                if (landed is not null)
-                {
-                    // Consent interstitials wrap the real destination in ?continue=
-                    string? cont = landed.Host.StartsWith("consent.", StringComparison.OrdinalIgnoreCase)
-                        ? System.Web.HttpUtility.ParseQueryString(landed.Query)["continue"] : null;
-                    final = cont ?? landed.ToString();
-                }
-            }
-            catch { /* reported to the page as "couldn't follow" */ }
-        }
-        string json = JsonSerializer.Serialize(new { url = final });
-        return env.CreateWebResourceResponse(
-            new MemoryStream(Encoding.UTF8.GetBytes(json)), 200, "OK",
-            "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
-    }
-
     private static Icon LoadAppIcon()
     {
         string? path = Environment.ProcessPath;
@@ -266,24 +235,6 @@ internal sealed class MainForm : Form
                 try
                 {
                     e.Response = await ProxyUtrAsync(env, uri.Query);
-                }
-                finally
-                {
-                    deferral.Complete();
-                }
-                return;
-            }
-
-            // /resolve?u=<short Google Maps link> follows the redirect to the full
-            // link, which carries the place's coordinates. Browsers can't read
-            // redirect targets across sites; this host can.
-            if (uri.AbsolutePath.Equals("/resolve", StringComparison.OrdinalIgnoreCase))
-            {
-                CoreWebView2Deferral deferral = e.GetDeferral();
-                try
-                {
-                    string target = System.Web.HttpUtility.ParseQueryString(uri.Query)["u"] ?? "";
-                    e.Response = await ResolveMapsLinkAsync(env, target);
                 }
                 finally
                 {
@@ -426,22 +377,6 @@ internal sealed class MainForm : Form
             await Task.Delay(250);
         }
 
-        // Short-link resolver: must refuse non-Google hosts, and follow Google's.
-        await core.ExecuteScriptAsync(
-            "window.__resolveProbe=null;(async()=>{try{" +
-            "const bad=await (await fetch('/resolve?u='+encodeURIComponent('https://example.com/x'))).json();" +
-            // A real public share link (tennis courts behind Nesconset Library, NY).
-            "const c=await courtFromMapsLink('https://maps.app.goo.gl/z5QYVSC8AYw9ZWgR7');" +
-            "window.__resolveProbe='refusesOthers='+(bad.url===null)+' shareLink->'+c.lat.toFixed(5)+','+c.lon.toFixed(5)" +
-            "}catch(e){window.__resolveProbe='ERR '+e.message}})()");
-        string resolveProbe = "timeout";
-        for (int i = 0; i < 80; i++)
-        {
-            string v = await core.ExecuteScriptAsync("window.__resolveProbe");
-            if (v != "null") { resolveProbe = JsonSerializer.Deserialize<string>(v) ?? v; break; }
-            await Task.Delay(250);
-        }
-
         // Drive fullscreen exactly the way the user does: let the page see an F11
         // keypress and watch it come back through the bridge.
         await core.ExecuteScriptAsync(
@@ -459,7 +394,6 @@ internal sealed class MainForm : Form
             + $",\"utrLive\":\"{utrProbe}\""
             + $",\"utrFlow\":{JsonSerializer.Serialize(utrFlow)}"
             + $",\"matchmakingRelay\":{JsonSerializer.Serialize(mmProbe)}"
-            + $",\"mapsLinkResolver\":{JsonSerializer.Serialize(resolveProbe)}"
             + $",\"fullscreenOn\":{(fsOn ? "true" : "false")}"
             + $",\"fullscreenRestored\":{(fsOff ? "true" : "false")}"
             + $",\"navOk\":{(_navOk ? "true" : "false")}"
