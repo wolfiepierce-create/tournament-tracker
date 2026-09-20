@@ -17,7 +17,7 @@ param(
     [string]$Out = "data/utr-events.json",
     # Used only if UTR is unreachable: re-publish the last good snapshot rather
     # than wiping the data off the live site.
-    [string]$Fallback = "https://wolfiepierce-create.github.io/tournament-tracker/data/utr-events.json"
+    [string]$Fallback = "https://tennisagenda.com/data/utr-events.json"
 )
 
 $ErrorActionPreference = "Stop"

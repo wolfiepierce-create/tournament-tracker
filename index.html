@@ -657,7 +657,10 @@ const HOST = (typeof window !== "undefined" && window.chrome && window.chrome.we
    • Everywhere else — a snapshot of every US event, rebuilt every 3 hours by a
      GitHub Action and served with the site. It covers the whole country, so the
      public file reveals nothing about where you live; distance is worked out here. */
-const UTR_SNAPSHOT = "https://wolfiepierce-create.github.io/tournament-tracker/data/utr-events.json";
+/* Relative on the web, so the snapshot comes from whatever origin is serving
+   the page and keeps working across a domain change. The desktop app is served
+   from its own private virtual host, so there it needs the public address. */
+const UTR_SNAPSHOT = HOST ? "https://tennisagenda.com/data/utr-events.json" : "data/utr-events.json";
 const UTR_SITE     = "https://app.utrsports.net/events/";
 /* UTR runs to 16.5. Each whole-number button covers that band (5 = 5.00–5.99);
    16 covers 16.00–16.49 and 16.5 is the top of the scale on its own. */
@@ -1266,7 +1269,9 @@ function fireNotification(title, body, url){
     if(url) n.onclick=()=>{ window.open(url,"_blank"); n.close(); };
   }catch(e){ /* this browser can't show one here; the in-app toast still did */ }
 }
-const APP_URL_FALLBACK = location.protocol==="https:" ? location.href.split("#")[0] : "https://wolfiepierce-create.github.io/tournament-tracker/";
+/* Inside the desktop app location points at the private virtual host, which
+   nobody else can open - and these links travel to phones. */
+const APP_URL_FALLBACK = (!HOST && location.protocol==="https:") ? location.href.split("#")[0] : "https://tennisagenda.com/";
 
 function notifyCheck(){
   if(!S.notify) return;
@@ -2189,8 +2194,8 @@ const MM_RELAY     = "https://ntfy.sh";
 const MM_PREFIX    = "jtt-mm1-";
 const MM_POLL      = 2*60*1000;
 const MM_MAX_POSTS = 5;
-const APP_LINK = location.protocol==="https:" ? location.origin+location.pathname
-                                              : "https://wolfiepierce-create.github.io/tournament-tracker/";
+const APP_LINK = (!HOST && location.protocol==="https:") ? location.origin+location.pathname
+                                                        : "https://tennisagenda.com/";
 const OVERPASS = ["https://overpass-api.de/api/interpreter",
                   "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
 

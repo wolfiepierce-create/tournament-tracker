@@ -9,7 +9,7 @@ Two ways to run it:
 
 | | |
 |---|---|
-| **the web page** | What everyone else uses: [wolfiepierce-create.github.io/tournament-tracker](https://wolfiepierce-create.github.io/tournament-tracker/). Works on a phone home screen. |
+| **the web page** | What everyone else uses: [tennisagenda.com](https://tennisagenda.com/). Works on a phone home screen. |
 | **`dist/Tournament Tracker.exe`** | Your own desktop copy. Window + system tray, keeps watching deadlines while closed. |
 
 ---
@@ -246,7 +246,7 @@ Sort by deadline, tournament date, distance or entry fee. Tap **☆** to save a 
 
 ## Getting it on your phone
 
-It's live at **<https://wolfiepierce-create.github.io/tournament-tracker/>**.
+It's live at **<https://tennisagenda.com/>**.
 
 The site is deployed by the GitHub Action in `.github/workflows/pages.yml`, which runs on
 every push to `main` and every 3 hours (to refresh the UTR snapshot). To publish a change:

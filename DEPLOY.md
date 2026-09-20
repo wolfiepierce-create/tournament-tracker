@@ -2,7 +2,7 @@
 
 > ## ✅ This is already done
 >
-> **Your site is live at <https://wolfiepierce-create.github.io/tournament-tracker/>**
+> **Your site is live at <https://tennisagenda.com/>**
 >
 > Open that on your phone and add it to your home screen (step 4 below).
 > The rest of this page is kept as a record of how it was set up, and step 5 is

@@ -39,7 +39,7 @@ jobs:
 
       - name: Assemble site
         run: |
-          cp index.html sw.js _site/
+          cp index.html sw.js CNAME _site/
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5
