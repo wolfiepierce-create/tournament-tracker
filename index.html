@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Tournaments">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%230071e3' stroke-width='8'/%3E%3Cpath d='M18 20a58 58 0 0 1 0 60M82 20a58 58 0 0 0 0 60' stroke='%230071e3' stroke-width='8' fill='none'/%3E%3C/svg%3E">
 <style>
 /* ============================================================
@@ -1234,11 +1236,29 @@ const THRESHOLDS=[
   {days:0,tag:"now",word:"closes today"},
 ];
 
+/* iPhones and iPads expose notifications only to a web app that has been added
+   to the Home Screen - never to an ordinary Safari tab, on any iOS version. So
+   `Notification` is simply missing there, and the old message ("this browser
+   can't show notifications") was true but a dead end: the fix is two taps away
+   and we were not telling anyone what it was. */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+               (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_INSTALLED = window.navigator.standalone === true ||
+               (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+
 function alertCapability(){
+
   if(HOST) return {ok:true, mode:"host"};
-  if(!("Notification" in window)) return {ok:false, why:"This browser can't show notifications."};
+  if(!("Notification" in window)){
+    if(IS_IOS && !IS_INSTALLED) return {ok:false, addToHome:true,
+      why:"On iPhone and iPad, alerts only work from the Home Screen version. Tap the Share button, choose Add to Home Screen, open it from there, then turn alerts on."};
+    if(IS_IOS) return {ok:false,
+      why:"Alerts on iPhone need iOS 16.4 or later. Everything else in the app still works."};
+    return {ok:false, why:"This browser can't show notifications."};
+  }
+
   if(!window.isSecureContext) return {ok:false, insecure:true,
-    why:"Browsers block notifications on pages opened straight from a file. Use the desktop app (Tournament Tracker.exe), or put the page on a web address."};
+    why:"Browsers block notifications on pages opened straight from a file. Open tennisagenda.com instead, or use the desktop app."};
   if(Notification.permission==="denied") return {ok:false,
     why:"Notifications are blocked for this page. Allow them in your browser's site settings, then try again."};
   return {ok:true, mode:"web", needsAsk:Notification.permission!=="granted"};
@@ -1252,6 +1272,12 @@ function alertCapability(){
 let swReg = null;
 if(!HOST && "serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").then(r=>{ swReg=r; }).catch(()=>{});
+  /* register() resolves before any worker is actually in control. `ready`
+     resolves only once one is, and that is the registration that can raise a
+     notification - without this, turning alerts on right after load fell
+     through to new Notification(), which phones ignore outright. */
+  navigator.serviceWorker.ready.then(r=>{ swReg=r; }).catch(()=>{});
+
 }
 function fireNotification(title, body, url){
   if(HOST){
@@ -1315,20 +1341,36 @@ async function toggleNotify(){
   }
   const cap=alertCapability();
   if(!cap.ok){
-    toast(cap.why, "⚠️", 7000);
+    toast(cap.why, "⚠️", cap.addToHome ? 12000 : 7000);
     if(cap.insecure) setTimeout(()=>toast("The desktop app also alerts you while it sits in the system tray.","💡",6000), 900);
     return;
   }
   if(cap.mode==="web" && cap.needsAsk){
     let p;
-    try{ p=await Notification.requestPermission(); }catch(e){ p="denied"; }
+    /* Safari only had the callback form for years: the call itself returns
+       undefined there, which our "!== granted" test read as a refusal even
+       when the user had just said yes. Accept either shape. */
+    try{
+      p = await new Promise(res=>{
+        const r = Notification.requestPermission(res);
+        if(r && typeof r.then === "function") r.then(res, ()=>res("denied"));
+      });
+    }catch(e){ p="denied"; }
+
     if(p!=="granted"){
       toast("Permission denied — allow notifications for this page in your browser settings.","⚠️",6500);
       return;
     }
   }
+  /* Let the worker take control before the confirmation fires, so the first
+     notification a phone ever shows goes through it. */
+  if(!swReg && !HOST && "serviceWorker" in navigator){
+    try{ swReg = await Promise.race([navigator.serviceWorker.ready,
+                                     new Promise(r=>setTimeout(()=>r(null), 3000))]); }catch(e){}
+  }
   S.notify=true; saveS(); paintNotify();
-  fireNotification("Deadline alerts are on","You'll hear from me 7, 3 and 1 days before entries close.");
+  fireNotification("Deadline alerts are on"
+,"You'll hear from me 7, 3 and 1 days before entries close.");
   toast("Deadline alerts are on","🔔");
   notifyCheck();
 }

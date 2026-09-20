@@ -11,7 +11,7 @@
     <AssemblyName>Tournament Tracker</AssemblyName>
     <RootNamespace>TournamentTracker</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.8.0</Version>
+    <Version>1.8.1</Version>
     <Product>Tournament Tracker</Product>
     <Company>Tournament Tracker</Company>
 
