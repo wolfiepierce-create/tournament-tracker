@@ -66,24 +66,15 @@ jobs:
           name: Tournament-Tracker-exe
           path: dist/Tournament Tracker.exe
 
+      # The notes live in their own file because a PowerShell here-string cannot
+      # be used here: its closing "@ has to sit at column 0, which breaks out of
+      # this YAML block and made the whole workflow file unparseable.
       - name: Publish the release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.event.inputs.tag || github.ref_name }}"
-          $notes = @"
-**Tournament Tracker $tag** - Windows desktop app. Nothing to install; just run it.
-
-### First run: Windows will warn you
-This app isn't code-signed yet, so Windows shows **"Windows protected your PC"**.
-Click **More info**, then **Run anyway**. It only happens once.
-
-### What it does
-Finds tennis tournaments near you from USTA and UTR, alerts you before entry
-deadlines close, and adds them to Google Calendar. Matchmaking finds someone nearby to hit with.
-
-Not affiliated with, endorsed by, or connected to the USTA or UTR. Always confirm
-dates, fees and deadlines on the official tournament page before paying.
-"@
-          gh release create $tag "dist/Tournament Tracker.exe" --title "Tournament Tracker $tag" --notes $notes
+          $notes = (Get-Content .github/release-notes.md -Raw).Replace("{{tag}}", $tag)
+          Set-Content notes.md $notes -Encoding utf8
+          gh release create $tag "dist/Tournament Tracker.exe" --title "Tournament Tracker $tag" --notes-file notes.md
