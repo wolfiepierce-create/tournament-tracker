@@ -2159,194 +2159,101 @@ function accountForm(mode, host){
 /* ============================================================
    Matchmaking
    ============================================================
-   Post "want to play" (as many time slots as you like, optionally at a court
-   you pin on the map) → it appears for everyone within your max-drive radius
-   → someone invites you for a court and time → you accept or decline → either
-   of you can cancel later, and the other side is told.
+   Post "want to play" at a court you choose; players nearby invite you for a
+   time; either of you can cancel. You must be signed in and 18 or over.
 
-   There is no server of our own. Everything travels through ntfy.sh, a free
-   public message relay (no account, keeps messages 12 hours):
-     • cell topics   jtt-mm1-c-<lat cell>_<lon cell>   posts, readable by anyone nearby
-     • inbox topics  jtt-mm1-r-<24 hex>                invites / answers / cancellations (JSON)
-     • alert topics  jtt-mm1-n-<same 24 hex>           the same events as plain sentences,
-                                                       for the ntfy phone app → real push
-   The map is cut into ~35-mile cells; you post to yours and read it plus its
-   eight neighbours, then distance is filtered here on the device.
+   Everything lives in the database now, not on a public relay, and the rules
+   are enforced there rather than in this page:
+     • only signed-in adults can read the board or post to it
+     • an invitation is visible to exactly two people
+     • blocking hides that person's posts server-side
+     • reports are written where only the owner can read them
+   A post carries a display name, skill, availability, note, the court, and
+   your ZIP's centre point — never your address, age, email or phone.
 
-   Privacy by construction: a post carries a display name, skill, format,
-   availability, an optional note and court, and your ZIP's centre point —
-   never GPS, address, age, phone or email. Contact details typed into the
-   note are stripped on the way out and again on the way in.
+   ntfy.sh is still used, but only to push a plain-language alert to a phone;
+   the channel travels on the post or invitation, so only the people already
+   allowed to see that row ever learn it.
    ============================================================ */
 
 const MM_RELAY     = "https://ntfy.sh";
 const MM_PREFIX    = "jtt-mm1-";
-const MM_CELL      = 0.5;                       // degrees per cell (~35 mi N–S)
 const MM_POLL      = 2*60*1000;
-const MM_KEEPALIVE = 6*3600*1000;               // re-post well before the relay's 12 h expiry
-const MM_RELAY_TTL = 12*3600*1000;
-const MM_LOOKBACK  = 15*60;                     // seconds; the relay can lag a little
 const MM_MAX_POSTS = 5;
-const APP_URL = location.protocol==="https:" ? location.origin+location.pathname
-                                             : "https://wolfiepierce-create.github.io/tournament-tracker/";
-const OVERPASS  = ["https://overpass-api.de/api/interpreter",
-                   "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+const APP_LINK = location.protocol==="https:" ? location.origin+location.pathname
+                                              : "https://wolfiepierce-create.github.io/tournament-tracker/";
+const OVERPASS = ["https://overpass-api.de/api/interpreter",
+                  "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
 
 const WHEN = {
-  today:    "Today",
-  tomorrow: "Tomorrow",
-  weekend:  "This weekend",
-  evenings: "Weekday evenings",
-  flexible: "Flexible",
-  at:       "A specific date & time",
+  today:"Today", tomorrow:"Tomorrow", weekend:"This weekend",
+  evenings:"Weekday evenings", flexible:"Flexible", at:"A specific date & time",
 };
 const FORMATS = { singles:"Singles", doubles:"Doubles", either:"Singles or doubles" };
 const SKILLS  = ["Unranked","Beginner","Intermediate","Advanced","Tournament", ...UTR_BANDS.map(b=>"UTR "+b.v)];
 
 const rid = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b=>b.toString(16).padStart(2,"0")).join("");
 
-let mm = Object.assign({
-  device: rid(8),
-  reply:  MM_PREFIX + "r-" + rid(12),           // my inbox
-  ack:false, posts:[], postLog:{}, incoming:{}, outgoing:{}, blocked:[], seenMsg:{}, lastInbox:0,
-}, loadPart("jtt.mm", {}));
-
-/* Bring a v1.4 single-post setup forward. */
-if(mm.post){ mm.posts = [...(mm.posts||[]), mm.post]; delete mm.post; }
-if(!Array.isArray(mm.posts)) mm.posts = [];
-mm.postLog = mm.postLog || {};
-mm.draft = Object.assign({
-  name: mm.name || "", skill: SKILLS.includes(mm.skill) ? mm.skill : "Unranked",
-  format: mm.format || "singles", when: mm.when || "today", time:"", note: mm.note || "", court:null,
-}, mm.draft || {});
+/* Local preferences only — everything shared lives in the database. */
+let mm = Object.assign({ ack:false, alertTopic:MM_PREFIX+"n-"+rid(12), draft:null }, loadPart("jtt.mm", {}));
+mm.draft = Object.assign({ skill:"Unranked", format:"singles", when:"today", time:"", note:"", court:null }, mm.draft||{});
 if(!SKILLS.includes(mm.draft.skill)) mm.draft.skill = "Unranked";
-
+if(!/^jtt-mm1-n-[a-f0-9]{24}$/.test(mm.alertTopic||"")) mm.alertTopic = MM_PREFIX+"n-"+rid(12);
+delete mm.posts; delete mm.incoming; delete mm.outgoing; delete mm.seenMsg;   // pre-account leftovers
 const saveMM = () => { LS.set("jtt.mm", mm); persist(); };
-saveMM();                                        // pins device id + inbox topic on first run
+saveMM();
 
-const alertTopicFor = reply => reply.replace(MM_PREFIX+"r-", MM_PREFIX+"n-");
+let mmPosts = [];        // my live posts
+let mmBoard = [];        // other people's, already filtered by the database
+let mmInvites = [];      // every invitation involving me
+let mmBlocked = [];      // people I've hidden
+let mmOpen = null, mmFind = {}, mmLastAt = 0;
+let mmSeen = LS.get("jtt.mmSeen", {});   // invitation id -> status, to spot what changed
 
-let mmBoard = [];                                // nearby posts, newest state per id
-let mmOpen  = null;                              // post id whose invite panel is open
-let mmFind  = {};                                // postId -> {state, list, chosen, time}
+const yearsOld = d => d ? Math.floor((Date.now()-new Date(d).getTime())/(365.2425*24*3600*1000)) : null;
+const isAdult  = () => profile && profile.dob && yearsOld(profile.dob) >= 18;
+const canMM    = () => signedIn() && !!profile && isAdult();
 
-/* ---------- validating anything that came from someone else ---------- */
-const CTRL_RE = new RegExp("[" + [[0,31],[127,159],[8234,8238],[8294,8297]]
-  .map(([a,b])=>String.fromCharCode(a)+"-"+String.fromCharCode(b)).join("") + "]", "g");
-const clean = (s,max) => String(s==null?"":s).replace(CTRL_RE," ").replace(/\s+/g," ").trim().slice(0,max);
+/* ---------- small helpers ---------- */
+const clean = (s,max) => String(s==null?"":s).replace(/[\s]+/g," ").trim().slice(0,max);
 function stripContacts(s){
   return s
-    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[removed]")                                // email
-    .replace(/(?:https?:\/\/|www\.)\S+/gi,"[removed]")                             // links
-    .replace(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g,"[removed]")  // US phone
-    .replace(/(^|\s)@[\w.]{2,}/g,"$1[removed]")                                     // @handles
+    .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g,"[removed]")
+    .replace(/(?:https?:\/\/|www\.)\S+/gi,"[removed]")
+    .replace(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g,"[removed]")
+    .replace(/(^|\s)@[\w.]{2,}/g,"$1[removed]")
     .replace(/\b(snap(chat)?|insta(gram)?|ig|tiktok|whatsapp|discord)\b\s*[:\-]?\s*\S+/gi,"[removed]");
 }
-const okNum   = (n,lo,hi) => typeof n==="number" && isFinite(n) && n>=lo && n<=hi;
-const okId    = s => typeof s==="string" && /^[a-f0-9]{8,32}$/.test(s);
-const okReply = s => typeof s==="string" && new RegExp("^"+MM_PREFIX+"r-[a-f0-9]{24}$").test(s);
-const okTime  = s => typeof s==="string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) && !isNaN(new Date(s));
-
-function parseCourt(c){
-  if(!c || !okNum(c.lat,-90,90) || !okNum(c.lon,-180,180)) return null;
-  return {
-    name: clean(c.name,60) || "Tennis courts",
-    lat:c.lat, lon:c.lon,
-    address: clean(c.address,90),
-    n: Number.isInteger(c.n) && c.n>0 && c.n<60 ? c.n : null,
-    lit: c.lit===true,
-    surface: clean(c.surface,20),
-  };
-}
-function parsePost(o){
-  if(!o || o.app!=="jtt" || o.v!==1) return null;
-  if(o.type==="cancel") return okId(o.id) ? {type:"cancel", id:o.id} : null;
-  if(o.type!=="post" || !okId(o.id) || !okId(o.dev) || !okReply(o.reply)) return null;
-  if(!okNum(o.lat,-90,90) || !okNum(o.lon,-180,180) || !okNum(o.at,0,4e12) || !okNum(o.exp,0,4e12)) return null;
-  return {
-    type:"post", id:o.id, dev:o.dev, reply:o.reply, lat:o.lat, lon:o.lon, at:o.at, exp:o.exp,
-    name:   clean(o.name,24) || "Player",
-    skill:  clean(o.skill,24),
-    format: FORMATS[o.format] ? o.format : "either",
-    when:   WHEN[o.when] ? o.when : "flexible",
-    time:   okTime(o.time) ? o.time : "",
-    note:   stripContacts(clean(o.note,140)),
-    place:  clean(o.place,40),
-    court:  parseCourt(o.court),
-  };
-}
-
-/* ---------- relay ---------- */
-const cellOf = (lat,lon) => [Math.floor(lat/MM_CELL), Math.floor(lon/MM_CELL)];
-const cellTopic = (a,b) => `${MM_PREFIX}c-${a}_${b}`;
-function nearbyTopics(lat,lon){
-  const [a,b]=cellOf(lat,lon), out=[];
-  for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++) out.push(cellTopic(a+i,b+j));
-  return out;
-}
-/* Every relay call gets a deadline. Without one, a request that hangs — which
-   phones do when a home-screen app is sent to the background mid-request —
-   never settles, the "already refreshing" guard stays up, and the board quietly
-   stops updating for good. That was the "can't see anyone's posts" bug. */
-function relayFetch(url, opts){
-  const ac=new AbortController(), t=setTimeout(()=>ac.abort(), 15000);
-  return fetch(url, {...(opts||{}), cache:"no-store", signal:ac.signal})
-    .catch(e=>{ throw new Error(e.name==="AbortError" ? "the relay didn't answer in time" : e.message); })
-    .finally(()=>clearTimeout(t));
-}
-async function relayPost(topic, obj){
-  const r = await relayFetch(`${MM_RELAY}/${topic}`, { method:"POST", body: JSON.stringify(obj) });
-  if(!r.ok) throw new Error(`relay HTTP ${r.status}`);
-}
-async function relayRead(topics, since){
-  const r = await relayFetch(`${MM_RELAY}/${topics.join(",")}/json?poll=1&since=${since}`);
-  if(!r.ok) throw new Error(`relay HTTP ${r.status}`);
-  const out=[];
-  for(const line of (await r.text()).split("\n")){
-    if(!line.trim()) continue;
-    try{
-      const m=JSON.parse(line);
-      if(m.event!=="message" || m.attachment || typeof m.message!=="string" || m.message.length>4000) continue;
-      out.push({ id:m.id, time:m.time, topic:m.topic, body:JSON.parse(m.message) });
-    }catch(e){ /* not ours, or not JSON */ }
-  }
-  return out;
-}
-/* A plain-language copy of an event for the other person's ntfy phone app, so
-   they're told even with this app closed. Best effort: never blocks the real message. */
-function pushTo(reply, title, message){
-  fetch(`${MM_RELAY}/`, { method:"POST", body: JSON.stringify({
-    topic: alertTopicFor(reply), title: clean(title,80), message: clean(message,200),
-    tags:["tennis"], click: APP_URL,
-  })}).catch(()=>{});
-}
-
-/* ---------- time helpers ---------- */
 const pad2 = n => String(n).padStart(2,"0");
 const localStamp = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const isoToLocal = iso => iso ? localStamp(new Date(iso)) : "";
+const localToIso = s => s ? new Date(s).toISOString() : null;
+const okTime = s => typeof s==="string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) && !isNaN(new Date(s));
 function fmtWhen(t){
   if(!t) return "time to agree";
-  const d=new Date(t); if(isNaN(d)) return t;
+  const d=new Date(t); if(isNaN(d)) return String(t);
   return d.toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 }
-const whenLabel = p => p.when==="at" && p.time ? fmtWhen(p.time) : WHEN[p.when];
+const whenLabel = p => p.when==="at" && p.time ? fmtWhen(p.time) : (WHEN[p.when]||"Flexible");
 function defaultTime(when, time){
   if(okTime(time)) return time;
   const d=new Date(); d.setMinutes(0,0,0);
-  if(when==="today"){ d.setHours(Math.max(d.getHours()+2, 17)); }
+  if(when==="today") d.setHours(Math.max(d.getHours()+2, 17));
   else if(when==="tomorrow"){ d.setDate(d.getDate()+1); d.setHours(17); }
   else if(when==="weekend"){ d.setDate(d.getDate()+((6-d.getDay()+7)%7||7)); d.setHours(10); }
   else { d.setDate(d.getDate()+1); d.setHours(18); }
   return localStamp(d);
 }
 function postExpiry(when, time){
-  if(when==="at" && okTime(time)) return new Date(time).getTime() + 3*3600*1000;
-  const d=new Date(), end=x=>{ x.setHours(23,59,0,0); return x.getTime(); };
+  if(when==="at" && okTime(time)) return new Date(new Date(time).getTime()+3*3600*1000);
+  const d=new Date(), end=x=>{ x.setHours(23,59,0,0); return x; };
   if(when==="today")    return end(d);
   if(when==="tomorrow"){ d.setDate(d.getDate()+1); return end(d); }
   if(when==="weekend"){ d.setDate(d.getDate()+((7-d.getDay())%7)); return end(d); }
-  return Date.now()+3*DAY;
+  return new Date(Date.now()+3*DAY);
 }
+/* milesBetween/toRad already exist in the tournament code above. */
+
 
 /* ---------- court details ---------- */
 function courtSummary(c){
@@ -2354,29 +2261,36 @@ function courtSummary(c){
   return [c.n ? `${c.n} court${c.n>1?"s":""}` : null, c.lit ? "lights" : null, c.surface || null]
     .filter(Boolean).join(" · ");
 }
-/* Turn-by-turn directions on OpenStreetMap — the same map data the app uses —
-   starting from your ZIP area. No Google anywhere in Matchmaking. */
+function courtLines(c){
+  const bits=[c.name, courtSummary(c)].filter(Boolean).join(" · ");
+  return c.address ? `${bits} — ${c.address}` : bits;
+}
 const directionsLink = c => {
   const from = S.lat!=null ? `${S.lat.toFixed(5)},${S.lon.toFixed(5)}` : "";
   return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${from}%3B${c.lat.toFixed(6)},${c.lon.toFixed(6)}`;
 };
+function parseCourt(c){
+  if(!c || typeof c.lat!=="number" || typeof c.lon!=="number") return null;
+  return { name: clean(c.name,60) || "Tennis courts", lat:c.lat, lon:c.lon,
+           address: clean(c.address,90), n: Number.isInteger(c.n)&&c.n>0&&c.n<60 ? c.n : null,
+           lit: c.lit===true, surface: clean(c.surface,20) };
+}
 async function lookupAddress(lat, lon){
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`);
-    const j=await r.json(), a=j.address||{};
+    const j=await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`)).json();
+    const a=j.address||{};
     const street=[a.house_number, a.road].filter(Boolean).join(" ");
     const town=a.town||a.city||a.village||a.suburb||a.hamlet||"";
     return { name: clean(j.name,60), address: clean([street, town, a.state].filter(Boolean).join(", "),90) };
   }catch(e){
     try{
-      const r=await fetch(`https://photon.komoot.io/reverse?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&limit=1`);
-      const p=((await r.json()).features[0]||{}).properties||{};
+      const p=((await (await fetch(`https://photon.komoot.io/reverse?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&limit=1`)).json()).features[0]||{}).properties||{};
       return { name: clean(p.name,60), address: clean([p.street, p.city, p.state].filter(Boolean).join(", "),90) };
     }catch(e2){ return {name:"", address:""}; }
   }
 }
 
-/* ---------- finding public courts (OpenStreetMap) ---------- */
+/* ---------- public courts from OpenStreetMap (for the picker) ---------- */
 async function overpassRace(q){
   const ctrls = OVERPASS.map(()=>new AbortController());
   const timer = setTimeout(()=>ctrls.forEach(c=>c.abort()), 16000);
@@ -2400,9 +2314,6 @@ nwr["name"]["amenity"~"^(school|college|university|community_centre)$"](around:$
   const els = await overpassRace(q);
   const courts = els.filter(e=>e.tags && /tennis/.test(e.tags.sport||"") && !PRIVATE.test(e.tags.access||""));
   const places = els.filter(e=>e.tags && e.tags.name && !/tennis/.test(e.tags.sport||""));
-
-  /* A park usually holds several court pitches side by side; each group
-     within ~150 m counts as one venue. */
   const venues=[];
   for(const c of courts){
     const p=centerOf(c); if(p.lat==null) continue;
@@ -2422,8 +2333,6 @@ nwr["name"]["amenity"~"^(school|college|university|community_centre)$"](around:$
   }
   return venues;
 }
-
-/* Courts don't move, so answers are kept for a month per area. */
 function courtCache(){ return LS.get("jtt.courts",{}); }
 function courtCacheSet(k,list){
   const c=courtCache(); c[k]={at:Date.now(),list};
@@ -2434,88 +2343,71 @@ async function venuesNear(mid, meters){
   const key=`v2:${mid.lat.toFixed(2)},${mid.lon.toFixed(2)},${Math.round(meters/1000)}`;
   const hit=courtCache()[key];
   if(hit && Date.now()-hit.at<30*DAY) return hit.list;
-  /* A failure (service down) is thrown on, so callers stop widening the search
-     instead of waiting out the same timeout again. An empty area just returns []. */
   const list=await courtsAround(mid, meters);
   if(list.length) courtCacheSet(key, list);
   return list;
 }
 
-/* ---------- my posts ---------- */
-async function publishPost(p){
-  await relayPost(cellTopic(...cellOf(S.lat,S.lon)), {
-    app:"jtt", v:1, type:"post", id:p.id, dev:mm.device, reply:mm.reply,
-    name:p.name, skill:p.skill, format:p.format, when:p.when, time:p.time, note:p.note, court:p.court,
-    place:S.place||"", lat:+S.lat.toFixed(4), lon:+S.lon.toFixed(4),
-    at:p.postedAt, exp:p.exp,
-  });
-  p.lastPublished=Date.now();
-}
-async function goLive(){
-  const d=mm.draft;
-  const name=clean(d.name,24);
-  if(!name){ toast("Add a display name first","✋"); return; }
-  if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
-  if(d.when==="at" && (!okTime(d.time) || new Date(d.time).getTime()<Date.now())){ toast("Pick a date and time in the future","✋"); return; }
-  if(!d.court){ toast("Pin the court you'll play at — tap 📍 Choose a court","📍",4600); return; }
-  if(mm.posts.length>=MM_MAX_POSTS){ toast(`You can have up to ${MM_MAX_POSTS} posts at once — take one down first`,"✋",4200); return; }
-  const note=stripContacts(clean(d.note,140));
-  if(note!==clean(d.note,140)) toast("Contact details were removed from your note — arrange things in the app","🔒",5200);
-
-  const p={ id:rid(8), name, skill:d.skill, format:d.format, when:d.when, time:d.when==="at"?d.time:"",
-            note, court:d.court||null, postedAt:Date.now(), exp:postExpiry(d.when,d.time), lastPublished:0 };
-  try{ await publishPost(p); }
-  catch(e){ toast("Couldn't reach the matchmaking relay — try again","⚠️",5000); return; }
-  mm.posts.push(p);
-  mm.postLog[p.id]={at:Date.now(), label:whenLabel(p)};
-  d.name=name; d.note=""; d.court=null; d.time="";
-  saveMM();
-  toast(`You're live for ${whenLabel(p).toLowerCase()} — nearby players can see you now`,"🎾",4200);
-  suggestAlerts();
-  renderMMNow(); mmRefresh();
-}
-async function takeDown(id){
-  const p=mm.posts.find(x=>x.id===id); if(!p) return;
-  mm.posts=mm.posts.filter(x=>x.id!==id); saveMM(); renderMMNow();
-  try{ await relayPost(cellTopic(...cellOf(S.lat,S.lon)), {app:"jtt",v:1,type:"cancel",id,dev:mm.device,at:Date.now()}); }catch(e){}
-  toast("Post taken down","✓");
+/* ---------- phone alerts ---------- */
+/* Best effort, and never blocks the real action. */
+function pushTo(topic, title, message){
+  if(!/^jtt-mm1-n-[a-f0-9]{24}$/.test(topic||"")) return;
+  fetch(`${MM_RELAY}/`, { method:"POST", body: JSON.stringify({
+    topic, title: clean(title,80), message: clean(message,200), tags:["tennis"], click: APP_LINK,
+  })}).catch(()=>{});
 }
 
-/* ---------- board ---------- */
-let boardBusy=false;
-async function mmRefresh(){
-  if(S.lat==null){ mmStatus("Set your ZIP code in Settings first"); return; }
-  if(boardBusy) return; boardBusy=true;
-  mmStatus("Looking for players nearby…","load");
+/* ---------- loading from the database ---------- */
+let mmBusy=false;
+async function mmLoad(quiet){
+  if(!canMM()) return;
+  if(mmBusy) return;
+  mmBusy=true;
+  if(!quiet) mmStatus("Looking for players nearby…","load");
   try{
-    const msgs = await relayRead(nearbyTopics(S.lat,S.lon), "12h");
-    const byId=new Map(), gone=new Set();
-    for(const m of msgs.sort((a,b)=>a.time-b.time)){
-      const p=parsePost(m.body); if(!p) continue;
-      if(p.type==="cancel"){ gone.add(p.id); continue; }
-      byId.set(p.id, p);                           // later re-posts replace earlier
-    }
+    const uid=session.user_id, nowIso=new Date().toISOString();
+    const [mine, board, invites, blocks] = await Promise.all([
+      sbAuthed(`/rest/v1/posts?author=eq.${uid}&select=*&order=created_at.desc`),
+      sbAuthed(`/rest/v1/posts?author=neq.${uid}&expires_at=gt.${nowIso}&select=*&order=created_at.desc&limit=200`),
+      sbAuthed(`/rest/v1/invites?or=(from_user.eq.${uid},to_user.eq.${uid})&select=*&order=updated_at.desc&limit=100`),
+      sbAuthed(`/rest/v1/blocks?blocker=eq.${uid}&select=blocked`),
+    ]);
     const now=Date.now();
-    const live=[...byId.values()].filter(p=>!gone.has(p.id) && p.dev!==mm.device && p.exp>now)
-      .map(p=>({...p, miles:+milesBetween(S.lat,S.lon,p.lat,p.lon).toFixed(1)}));
-    const hidden = live.filter(p=>mm.blocked.includes(p.dev));
-    const far    = live.filter(p=>!mm.blocked.includes(p.dev) && p.miles>S.radius);
-    mmBoard = live.filter(p=>!mm.blocked.includes(p.dev) && p.miles<=S.radius).sort((a,b)=>a.miles-b.miles);
-    renderBoard();
+    mmPosts   = mine.filter(p=>new Date(p.expires_at).getTime()>now).map(rowToPost);
+    mmBlocked = blocks.map(b=>b.blocked);
+    mmInvites = invites;
 
-    /* Say why posts aren't shown, so an empty board is never a mystery. */
+    const all = board.map(rowToPost);
+    const far = all.filter(p=>p.miles!=null && p.miles>S.radius);
+    mmBoard = all.filter(p=>p.miles==null || p.miles<=S.radius).sort((a,b)=>(a.miles??99)-(b.miles??99));
+
+    noticeInviteChanges();
+    renderBoard(); renderMM();
+
     const why=[];
     if(far.length) why.push(`${far.length} more beyond your ${S.radius}-mi max drive (nearest ${Math.min(...far.map(p=>p.miles))} mi)`);
-    if(hidden.length) why.push(`${hidden.length} from players you hid`);
+    if(mmBlocked.length) why.push(`${mmBlocked.length} player${mmBlocked.length===1?"":"s"} you blocked`);
     const time=new Date().toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
     mmStatus((mmBoard.length
-      ? `${mmBoard.length} post${mmBoard.length===1?"":"s"} within ${S.radius} mi`
-      : `No one within ${S.radius} mi has posted in the last 12 hours`)
-      + (why.length ? ` · ${why.join(" · ")}` : "") + ` · updated ${time}`,
-      null, mm.blocked.length ? { label:"Unhide players", run:()=>{ mm.blocked=[]; saveMM(); mmRefresh(); toast("Everyone's visible again","✓"); } } : null);
+        ? `${mmBoard.length} post${mmBoard.length===1?"":"s"} within ${S.radius} mi`
+        : `No one within ${S.radius} mi is looking for a game right now`)
+      + (why.length?` · ${why.join(" · ")}`:"") + ` · updated ${time}`,
+      null, mmBlocked.length ? {label:"Unblock everyone", run:unblockAll} : null);
   }catch(e){
-    mmStatus(`Couldn't reach the matchmaking relay (${e.message}). Tap Refresh to retry.`);
-  }finally{ boardBusy=false; }
+    mmStatus(`Couldn't reach your account (${e.message}). Tap Refresh to retry.`);
+  }finally{ mmBusy=false; }
+}
+function rowToPost(r){
+  const court=parseCourt(r.court)||{name:"Tennis courts",lat:r.lat,lon:r.lon,address:"",n:null,lit:false,surface:""};
+  return {
+    id:r.id, author:r.author, name:clean(r.author_name,24)||"Player",
+    skill:clean(r.skill,24), format:FORMATS[r.format]?r.format:"either",
+    when:WHEN[r.when_key]?r.when_key:"flexible", time:isoToLocal(r.play_time),
+    note:stripContacts(clean(r.note,140)), place:clean(r.place,40),
+    lat:r.lat, lon:r.lon, court, alertTopic:r.alert_topic,
+    at:r.created_at, expires:r.expires_at,
+    miles: S.lat!=null ? +milesBetween(S.lat,S.lon,r.lat,r.lon).toFixed(1) : null,
+  };
 }
 function mmStatus(text,mode,action){
   const b=$("#mmStatus"); if(!b) return; b.innerHTML="";
@@ -2524,112 +2416,98 @@ function mmStatus(text,mode,action){
   if(action){ const a=el("button","act",action.label); a.onclick=action.run; b.appendChild(a); }
 }
 
-/* ---------- invites, answers, cancellations ---------- */
-async function sendInvite(post, court, time){
+/* ---------- posting ---------- */
+async function goLive(){
   const d=mm.draft;
-  if(!clean(d.name,24)){ toast("Add your display name in the form above — it goes on the invite","✋",4200); return false; }
-  if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return false; }
-  if(!okTime(time)){ toast("Pick a date and time","✋"); return false; }
-  const iid=rid(8);
-  const body={ app:"jtt", v:1, type:"invite", iid, postId:post.id, dev:mm.device, reply:mm.reply,
-    name:clean(d.name,24), skill:d.skill, place:S.place||"", lat:+S.lat.toFixed(4), lon:+S.lon.toFixed(4),
-    court:{name:court.name, lat:court.lat, lon:court.lon, address:court.address||"", n:court.n||null, lit:!!court.lit, surface:court.surface||""},
-    time, at:Date.now() };
-  await relayPost(post.reply, body);
-  mm.outgoing[iid]={ postId:post.id, to:{name:post.name, dev:post.dev, reply:post.reply},
-                     court:body.court, time, status:"sent", at:Date.now() };
-  saveMM();
-  pushTo(post.reply, `${body.name} wants to play`, `${fmtWhen(time)} at ${court.name}`);
+  if(!canMM()) return;
+  if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
+  if(d.when==="at" && (!okTime(d.time) || new Date(d.time).getTime()<Date.now())){ toast("Pick a date and time in the future","✋"); return; }
+  if(!d.court){ toast("Pin the court you'll play at — tap 📍 Choose a court","📍",4600); return; }
+  if(mmPosts.length>=MM_MAX_POSTS){ toast(`You can have up to ${MM_MAX_POSTS} posts at once — take one down first`,"✋",4200); return; }
+  const note=stripContacts(clean(d.note,140));
+  if(note!==clean(d.note,140)) toast("Contact details were removed from your note — arrange things in the app","🔒",5200);
+
+  try{
+    await sbAuthed("/rest/v1/posts", { method:"POST", body: JSON.stringify({
+      author: session.user_id, author_name: profile.display_name,
+      skill: d.skill, format: d.format, when_key: d.when,
+      play_time: d.when==="at" ? localToIso(d.time) : null,
+      note, court: d.court, lat:+S.lat.toFixed(4), lon:+S.lon.toFixed(4), place:S.place||"",
+      expires_at: postExpiry(d.when,d.time).toISOString(), alert_topic: mm.alertTopic,
+    })});
+  }catch(e){ toast(`Couldn't post (${e.message})`,"⚠️",5000); return; }
+
+  d.note=""; d.court=null; d.time=""; saveMM();
+  toast("You're live — players nearby can see you now","🎾",4200);
   suggestAlerts();
+  await mmLoad(true);
+}
+async function takeDown(id){
+  try{ await sbAuthed(`/rest/v1/posts?id=eq.${id}`, { method:"DELETE" }); }
+  catch(e){ toast("Couldn't take it down — try again","⚠️"); return; }
+  toast("Post taken down","✓");
+  await mmLoad(true);
+}
+
+/* ---------- invitations ---------- */
+async function sendInvite(post, court, timeLocal){
+  if(!okTime(timeLocal)){ toast("Pick a date and time","✋"); return false; }
+  const row = await sbAuthed("/rest/v1/invites", { method:"POST", headers:{Prefer:"return=representation"},
+    body: JSON.stringify({ post_id:post.id, from_user:session.user_id, to_user:post.author,
+      court, play_time: localToIso(timeLocal), from_name: profile.display_name, alert_topic: mm.alertTopic })});
+  pushTo(post.alertTopic, `${profile.display_name} wants to play`, `${fmtWhen(timeLocal)} at ${court.name}`);
+  suggestAlerts();
+  mmSeen[row[0].id]="new"; LS.set("jtt.mmSeen",mmSeen);
   return true;
 }
-async function answerInvite(iid, ok){
-  const inv=mm.incoming[iid]; if(!inv || inv.status!=="new") return;
-  const me=clean(mm.draft.name,24)||"Player";
+async function answerInvite(inv, ok){
   try{
-    await relayPost(inv.from.reply, { app:"jtt", v:1, type:"reply", iid, ok, name:me,
-      court:inv.court, time:inv.time, at:Date.now() });
+    await sbAuthed(`/rest/v1/invites?id=eq.${inv.id}`, { method:"PATCH",
+      body: JSON.stringify({ status: ok?"accepted":"declined" }) });
   }catch(e){ toast("Couldn't send your answer — try again","⚠️"); return; }
-  inv.status = ok ? "accepted" : "declined"; saveMM(); renderMMNow();
-  pushTo(inv.from.reply, ok ? `${me} accepted — match on!` : `${me} can't make it`,
-         `${fmtWhen(inv.time)} at ${inv.court.name}`);
-  toast(ok ? `Match on with ${inv.from.name} — see you at ${inv.court.name}` : "Invite declined", ok?"🎾":"✓", 4800);
+  pushTo(inv.alert_topic, ok ? `${profile.display_name} accepted — match on!` : `${profile.display_name} can't make it`,
+         `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"the court"}`);
+  toast(ok ? `Match on with ${inv.from_name} — see you there` : "Invite declined", ok?"🎾":"✓", 4600);
+  await mmLoad(true);
 }
-/* Cancelling works from either side, for a confirmed match or an invite still
-   waiting. The other person is told in the app and, if they use it, by ntfy. */
-async function cancelMatch(iid){
-  const inc=mm.incoming[iid], out=mm.outgoing[iid], rec=inc||out;
-  if(!rec) return;
-  const other = inc ? inc.from : out.to;
-  const me=clean(mm.draft.name,24)||"Player";
-  const wasConfirmed = rec.status==="accepted";
-  if(other.reply){
-    try{ await relayPost(other.reply, {app:"jtt", v:1, type:"cancel", iid, name:me, at:Date.now()}); }
-    catch(e){ toast("Couldn't reach the relay — try again","⚠️"); return; }
-    pushTo(other.reply, wasConfirmed ? `${me} cancelled your match` : `${me} withdrew their invite`,
-           `${fmtWhen(rec.time)} at ${rec.court.name}`);
-  }
-  rec.status="cancelled"; rec.cancelledBy="me"; saveMM(); renderMMNow(); renderBoard();
-  toast(other.reply ? `${other.name} has been told` : "Cancelled here — this older match can't notify the other player","✓",4200);
-}
-
-let inboxBusy=false;
-async function checkInbox(){
-  if(!mm.ack || inboxBusy) return;
-  inboxBusy=true;
+async function cancelInvite(inv){
+  const mine = inv.from_user===session.user_id;
+  const wasConfirmed = inv.status==="accepted";
   try{
-    const startedAt=Math.floor(Date.now()/1000);
-    const since = mm.lastInbox ? Math.max(0, mm.lastInbox-MM_LOOKBACK) : "12h";
-    let msgs; try{ msgs=await relayRead([mm.reply], since); }catch(e){ return; }
-    const events=[];
-    const mine = id => mm.posts.some(p=>p.id===id) || (mm.postLog[id] && Date.now()-mm.postLog[id].at < 3*DAY);
+    await sbAuthed(`/rest/v1/invites?id=eq.${inv.id}`, { method:"PATCH", body: JSON.stringify({ status:"cancelled" }) });
+  }catch(e){ toast("Couldn't cancel — try again","⚠️"); return; }
+  /* Tell whichever side wasn't me. */
+  const topic = mine ? inv.postAlertTopic : inv.alert_topic;
+  pushTo(topic, wasConfirmed ? `${profile.display_name} cancelled your match` : `${profile.display_name} withdrew their invite`,
+         `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"the court"}`);
+  toast(wasConfirmed ? "Match cancelled — they've been told" : "Invite withdrawn","✓",4200);
+  await mmLoad(true);
+}
 
-    for(const m of msgs.sort((a,b)=>a.time-b.time)){
-      if(mm.seenMsg[m.id]) continue;
-      mm.seenMsg[m.id]=Date.now();
-      const b=m.body||{};
-      if(b.app!=="jtt" || b.v!==1 || !okId(b.iid)) continue;
-      const who=clean(b.name,24)||"Player";
-
-      if(b.type==="invite"){
-        if(mm.incoming[b.iid] || !mine(b.postId) || !okReply(b.reply) || !okId(b.dev)) continue;
-        if(!okNum(b.lat,-90,90) || !okNum(b.lon,-180,180) || mm.blocked.includes(b.dev)) continue;
-        const court=parseCourt(b.court); if(!court) continue;
-        mm.incoming[b.iid]={ postId:b.postId,
-          from:{ name:who, skill:clean(b.skill,24), place:clean(b.place,40), reply:b.reply, dev:b.dev, lat:b.lat, lon:b.lon },
-          court, time: okTime(b.time) ? b.time : "", status:"new", at:Date.now() };
-        events.push([`${who} wants to play`, `${fmtWhen(b.time)} at ${court.name}`]);
-      }
-      else if(b.type==="reply"){
-        const o=mm.outgoing[b.iid];
-        if(!o || o.status!=="sent") continue;
-        o.status = b.ok===true ? "accepted" : "declined";
-        events.push(o.status==="accepted"
-          ? [`${o.to.name} accepted — match on!`, `${fmtWhen(o.time)} at ${o.court.name}`]
-          : [`${o.to.name} can't make it`, "Try another time or player"]);
-      }
-      else if(b.type==="cancel"){
-        const inc=mm.incoming[b.iid], out=mm.outgoing[b.iid], rec=inc||out;
-        if(!rec || rec.status==="cancelled" || rec.status==="declined") continue;
-        const name = inc ? inc.from.name : out.to.name;
-        const wasConfirmed = rec.status==="accepted";
-        rec.status="cancelled"; rec.cancelledBy="them";
-        events.push([wasConfirmed ? `${name} cancelled your match` : `${name} withdrew their invite`,
-                     `${fmtWhen(rec.time)} at ${rec.court.name}`]);
-      }
+/* What changed since we last looked? */
+function noticeInviteChanges(){
+  const events=[];
+  for(const inv of mmInvites){
+    const was=mmSeen[inv.id], now=inv.status;
+    if(was===now) continue;
+    mmSeen[inv.id]=now;
+    if(was===undefined && inv.to_user===session.user_id && now==="new"){
+      events.push([`${clean(inv.from_name,24)||"Someone"} wants to play`,
+                   `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"a court"}`]);
+    } else if(was && inv.from_user===session.user_id && (now==="accepted"||now==="declined")){
+      events.push([now==="accepted" ? "Your invite was accepted — match on!" : "Your invite was declined",
+                   `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"a court"}`]);
+    } else if(was && now==="cancelled"){
+      events.push(["A match was cancelled", `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"a court"}`]);
     }
-    mm.lastInbox=startedAt;
-    const cut=Date.now()-2*DAY;
-    for(const k of Object.keys(mm.seenMsg)) if(mm.seenMsg[k]<cut) delete mm.seenMsg[k];
-    for(const k of Object.keys(mm.postLog)) if(Date.now()-mm.postLog[k].at > 7*DAY) delete mm.postLog[k];
-    /* Save first: a notification failing must never lose what just arrived. */
-    saveMM();
-    for(const [t,bd] of events){ try{ alertMM(t,bd); }catch(e){} }
-    if(events.length){ renderMM(); renderBoard(); }
-  } finally { inboxBusy=false; }
+  }
+  const live=new Set(mmInvites.map(i=>i.id));
+  for(const k of Object.keys(mmSeen)) if(!live.has(k)) delete mmSeen[k];
+  LS.set("jtt.mmSeen", mmSeen);
+  for(const [t,b] of events){ try{ alertMM(t,b); }catch(e){} }
 }
 function alertMM(title, body){
-  toast(title, "🎾", 5200);
+  toast(title,"🎾",5200);
   if(!S.notify) return;
   const cap=alertCapability();
   if(!cap.ok || (cap.mode==="web" && Notification.permission!=="granted")) return;
@@ -2637,31 +2515,63 @@ function alertMM(title, body){
 }
 function suggestAlerts(){
   if(S.notify) return;
-  setTimeout(()=>toast("Turn on Alerts (top right) to be told the moment someone answers","🔔",5200), 1400);
-}
-function matchCalendarUrl(withName, court, time){
-  const s=new Date(time); if(isNaN(s)) return null;
-  const e=new Date(s.getTime()+90*60000);
-  const z=d=>d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
-  return "https://calendar.google.com/calendar/render?"+new URLSearchParams({
-    action:"TEMPLATE", text:`Tennis vs ${withName}`, dates:`${z(s)}/${z(e)}`,
-    location: court.address ? `${court.name}, ${court.address}` : `${court.name} (${court.lat.toFixed(5)}, ${court.lon.toFixed(5)})`,
-    details:[`Arranged through Matchmaking.`, courtSummary(court), `Map & directions: ${directionsLink(court)}`].filter(Boolean).join("\n"),
-  });
+  setTimeout(()=>toast("Turn on Alerts (top right) to hear the moment someone answers","🔔",5200), 1400);
 }
 
-/* ---------- rendering (never while you're typing) ---------- */
-/* Background refreshes arrive every couple of minutes. Rebuilding a panel
-   while a field in it has focus would throw away what you're typing, so the
-   rebuild waits until you leave the panel. */
+/* ---------- blocking and reporting ---------- */
+async function blockUser(userId, name){
+  try{ await sbAuthed("/rest/v1/blocks", { method:"POST", headers:{Prefer:"resolution=merge-duplicates"},
+        body: JSON.stringify({ blocker:session.user_id, blocked:userId }) }); }
+  catch(e){ toast("Couldn't block — try again","⚠️"); return; }
+  toast(`${name} is blocked — you won't see their posts`,"✓",4200);
+  await mmLoad(true);
+}
+async function unblockAll(){
+  try{ await sbAuthed(`/rest/v1/blocks?blocker=eq.${session.user_id}`, { method:"DELETE" }); }
+  catch(e){ toast("Couldn't unblock — try again","⚠️"); return; }
+  toast("Everyone's visible again","✓");
+  await mmLoad(true);
+}
+function reportSheet(post){
+  const scrim=el("div","scrim"), m=el("div","sheet");
+  m.appendChild(el("h2",null,`Report ${post.name}`));
+  m.appendChild(el("p","lede","This goes to whoever runs the app. Say what happened — the post is attached automatically."));
+  const f=el("div","field"); f.appendChild(el("label",null,"What's wrong?"));
+  const ta=el("textarea"); ta.maxLength=500; ta.placeholder="e.g. inappropriate messages, fake profile, made me uncomfortable";
+  f.appendChild(ta); m.appendChild(f);
+  const also=el("label","fine"); const cb=el("input"); cb.type="checkbox"; cb.checked=true;
+  also.appendChild(cb); also.appendChild(document.createTextNode(" Also block this person"));
+  m.appendChild(also);
+  const foot=el("div","sheet-foot");
+  const cancel=el("button","btn-plain","Cancel"); cancel.onclick=()=>scrim.remove();
+  const send=el("button","btn","Send report");
+  send.onclick=async()=>{
+    const reason=clean(ta.value,500);
+    if(!reason){ ta.focus(); return; }
+    send.disabled=true; send.textContent="Sending…";
+    try{
+      await sbAuthed("/rest/v1/reports", { method:"POST", body: JSON.stringify({
+        reporter: session.user_id, reported_user: post.author, post_id: post.id, reason,
+        details: { name:post.name, note:post.note, court:post.court && post.court.name, place:post.place },
+      })});
+      if(cb.checked) await blockUser(post.author, post.name);
+      scrim.remove();
+      toast("Report sent — thank you","✓",4600);
+    }catch(e){ send.disabled=false; send.textContent="Send report"; toast(`Couldn't send (${e.message})`,"⚠️",5000); }
+  };
+  foot.appendChild(cancel); foot.appendChild(send); m.appendChild(foot);
+  scrim.appendChild(m); document.body.appendChild(scrim);
+  scrim.onclick=e=>{ if(e.target===scrim) scrim.remove(); };
+  ta.focus();
+}
+
+/* ---------- rendering ---------- */
 const editingIn = box => { const a=document.activeElement; return !!(box && a && box.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); };
 function whenIdle(box, fn){
   if(!editingIn(box)){ fn(); return; }
-  box.__pending = fn;                      // latest wins
+  box.__pending = fn;
   if(box.__waiting) return;
   box.__waiting = true;
-  /* Leaving the field normally fires focusout, but not always (the window
-     losing focus, a scripted blur), so a light poll backs it up. */
   const flush = () => {
     if(editingIn(box)) return;
     clearInterval(box.__poll); box.removeEventListener("focusout", onOut);
@@ -2682,7 +2592,6 @@ function sel(options, val){
   s.value=val; return s;
 }
 function linkAct(text, href, cls){ const a=el("a","act"+(cls?" "+cls:""),text); a.href=href; a.target="_blank"; a.rel="noopener"; return a; }
-/* Two taps to cancel, so a stray tap can't call off a match. */
 function confirmButton(label, sure, onGo){
   const b=el("button","act",label); let armed=null;
   b.onclick=()=>{
@@ -2692,82 +2601,109 @@ function confirmButton(label, sure, onGo){
   };
   return b;
 }
-function courtLines(c){
-  const bits=[c.name, courtSummary(c)].filter(Boolean).join(" · ");
-  return c.address ? `${bits} — ${c.address}` : bits;
+
+function gateNotice(){
+  const box=$("#mmMine");
+  const show=(title, lines, button)=>{
+    box.innerHTML="";
+    box.appendChild(el("h2",null,title));
+    const n=el("div","notice");
+    lines.forEach(t=>{ const p=el("p",null,t); p.style.margin="0 0 8px"; n.appendChild(p); });
+    box.appendChild(n);
+    if(button) box.appendChild(button);
+    mmStatus(title);
+    $("#mmBoard").innerHTML="";
+  };
+  if(!signedIn()){
+    const b=el("button","btn","Create an account or sign in");
+    b.onclick=()=>openSettings(false);
+    show("Matchmaking needs an account", [
+      "Posts are only visible to signed-in players nearby, and an account is how invitations reach you.",
+      "Tournaments work without one — this is only for finding someone to play.",
+    ], b);
+    return true;
+  }
+  if(!profile){
+    const b=el("button","btn","Finish setting up"); b.onclick=()=>openSettings(false);
+    show("Choose a username first", ["Other players see your username, so pick one before you post."], b);
+    return true;
+  }
+  if(!isAdult()){
+    show("Matchmaking is 18 and over", [
+      `Your account says you're ${yearsOld(profile.dob)}. Matchmaking arranges meetings with strangers, so it's open to adults only.`,
+      "Everything else in the app — tournaments, deadlines, alerts, calendar — works exactly as before.",
+    ]);
+    return true;
+  }
+  return false;
 }
 
 function renderMMNow(){
   const box=$("#mmMine"); if(!box) return;
+  if(gateNotice()) return;
   box.innerHTML="";
-  const age=currentAge(), minor = age!=null && age<18;
 
   if(!mm.ack){
     box.appendChild(el("h2",null,"Find someone to hit with"));
-    box.appendChild(el("p","lede","Post when you want to play and it shows up for players within your max-drive radius. You choose the court; anyone nearby can see it on the map and invite you to play there."));
-    const n=el("div","notice"+(minor?" warn":""));
+    box.appendChild(el("p","lede","Post when you want to play and where, and players within your max-drive radius can invite you."));
+    const n=el("div","notice");
     n.appendChild(el("strong",null,"Before you post"));
     const ul=el("ul");
     [
-      "Posts are public to anyone nearby using the app. They show your display name, skill and ZIP area — never your address, age, phone or email.",
-      "Arrange the court and time here in the app. Don't share contact details or social handles.",
-      "Only meet at public courts, in daylight where you can.",
-      minor ? "You're under 18: only play with a parent or guardian's OK, and bring them along." : "If you're playing a junior, make sure a parent or guardian is involved.",
+      "Your post shows your username, skill and ZIP area — never your address, phone or email.",
+      "Arrange everything here. Don't share contact details or social handles.",
+      "Meet at public courts, in daylight where you can, and tell someone where you're going.",
+      "If anyone makes you uncomfortable, use Report — it blocks them at the same time.",
     ].forEach(t=>ul.appendChild(el("li",null,t)));
     n.appendChild(ul); box.appendChild(n);
     const b=el("button","btn","I understand");
-    b.onclick=()=>{ mm.ack=true; saveMM(); renderMMNow(); checkInbox(); mmRefresh(); };
+    b.onclick=()=>{ mm.ack=true; saveMM(); renderMMNow(); mmLoad(); };
     box.appendChild(b);
     return;
   }
 
-  /* --- alerts --- */
   if(!S.notify){
     const n=el("div","notice slim");
-    n.appendChild(el("span",null,"Alerts are off, so you'll only see invites while this screen is open. "));
+    n.appendChild(el("span",null,"Alerts are off, so you'll only see invitations while this screen is open. "));
     const on=el("button","act primary","Turn on alerts"); on.onclick=()=>toggleNotify().then(()=>renderMMNow());
     n.appendChild(on); box.appendChild(n);
   }
 
-  /* --- my live posts --- */
-  if(mm.posts.length){
+  /* my live posts */
+  if(mmPosts.length){
     const s=el("div","mm-posts");
-    s.appendChild(el("h3",null, mm.posts.length===1 ? "You're live" : `You're live · ${mm.posts.length} times`));
-    for(const p of mm.posts){
+    s.appendChild(el("h3",null, mmPosts.length===1 ? "You're live" : `You're live · ${mmPosts.length} times`));
+    for(const p of mmPosts){
       const r=el("div","inv live"), t=el("div","txt");
       const l1=el("div"); l1.appendChild(el("span","dot-live")); l1.appendChild(el("b",null,whenLabel(p)));
-      l1.appendChild(document.createTextNode(` · ${FORMATS[p.format]} · ${p.skill}`));
+      l1.appendChild(document.createTextNode(` · ${FORMATS[p.format]} · ${p.skill||"Unranked"}`));
       t.appendChild(l1);
-      const l2=[p.court ? `At ${courtLines(p.court)}` : "Court to agree", p.note ? `“${p.note}”` : ""].filter(Boolean).join(" · ");
-      t.appendChild(el("div","s",l2));
+      t.appendChild(el("div","s",[`At ${courtLines(p.court)}`, p.note?`“${p.note}”`:""].filter(Boolean).join(" · ")));
       r.appendChild(t);
-      if(p.court) r.appendChild(mapButton(p.court, "Your court"));
+      r.appendChild(mapButton(p.court, "Your court"));
       r.appendChild(confirmButton("Take down","Tap to confirm",()=>takeDown(p.id)));
       s.appendChild(r);
     }
     box.appendChild(s);
   }
 
-  /* --- compose --- */
+  /* compose */
   const d=mm.draft;
-  const compose=el("div", mm.posts.length ? "mm-compose mm-sub" : "mm-compose");
-  compose.appendChild(el("h2",null, mm.posts.length ? "Add another time" : "Want to play?"));
-  compose.appendChild(el("p","lede",`Visible to players within ${S.radius} mi of ${S.place||"your ZIP"} until it expires or you take it down.`));
+  const compose=el("div", mmPosts.length ? "mm-compose mm-sub" : "mm-compose");
+  compose.appendChild(el("h2",null, mmPosts.length ? "Add another time" : "Want to play?"));
+  compose.appendChild(el("p","lede",`Posting as ${profile.display_name}. Visible to players within ${S.radius} mi of ${S.place||"your ZIP"}.`));
   const f=el("div","mm-form");
   const field=(label,node,wide)=>{ const w=el("div","field"+(wide?" wide":"")); w.appendChild(el("label",null,label)); w.appendChild(node); f.appendChild(w); return w; };
   const bind=(node,key)=>{ node.addEventListener("input",()=>{ d[key]=node.value; }); node.addEventListener("change",()=>{ d[key]=node.value; saveMM(); }); return node; };
 
-  field("Display name", bind(inp(d.name,"First name or nickname",24),"name"));
   field("Skill",  bind(sel(SKILLS.map(s=>[s,s]), d.skill),"skill"));
   field("Format", bind(sel(Object.entries(FORMATS), d.format),"format"));
   const whenS = bind(sel(Object.entries(WHEN), d.when),"when");
   field("When", whenS);
   const ti=bind(inp(d.time||defaultTime("tomorrow")),"time"); ti.type="datetime-local"; ti.min=localStamp(new Date());
-  const tw=field("Date & time", ti);
-  tw.hidden = d.when!=="at";
-  whenS.addEventListener("change",()=>{ tw.hidden = whenS.value!=="at"; if(whenS.value==="at" && !okTime(d.time)){ d.time=ti.value; } });
+  const tw=field("Date & time", ti); tw.hidden = d.when!=="at";
+  whenS.addEventListener("change",()=>{ tw.hidden = whenS.value!=="at"; if(whenS.value==="at" && !okTime(d.time)) d.time=ti.value; });
 
-  /* court (optional) */
   const cw=el("div","field wide"); cw.appendChild(el("label",null,"Court"));
   const cr=el("div","court-pick");
   if(d.court){
@@ -2785,116 +2721,100 @@ function renderMMNow(){
   cw.appendChild(cr); f.appendChild(cw);
 
   const noteT=el("textarea"); noteT.maxLength=140; noteT.placeholder="Optional — e.g. “Looking for a practice set, happy to hit rallies”"; noteT.value=d.note||"";
-  bind(noteT,"note");
-  field("Note", noteT, true);
+  bind(noteT,"note"); field("Note", noteT, true);
   compose.appendChild(f);
 
   const a=el("div","mm-actions");
-  const go=el("button","btn", mm.posts.length ? "Post this time too" : "Post “Want to play”");
+  const go=el("button","btn", mmPosts.length ? "Post this time too" : "Post “Want to play”");
   go.onclick=async()=>{ go.disabled=true; await goLive(); go.disabled=false; };
   a.appendChild(go);
-  a.appendChild(el("span","fine","Shows your name, skill and ZIP area only. Contact details in the note are removed automatically."));
+  a.appendChild(el("span","fine","Shows your username, skill and ZIP area only. Contact details in the note are removed automatically."));
   compose.appendChild(a);
 
-  /* --- invites and matches --- */
-  const now=Date.now();
-  const inc=Object.entries(mm.incoming), out=Object.entries(mm.outgoing);
+  /* invitations */
+  const uid=session.user_id, now=Date.now();
   const upcoming = t => !t || isNaN(new Date(t)) || new Date(t).getTime() > now - 6*3600*1000;
-  const matches=[
-    ...inc.filter(([,v])=>v.status==="accepted" && upcoming(v.time)).map(([iid,v])=>({iid, with:v.from.name, court:v.court, time:v.time})),
-    ...out.filter(([,v])=>v.status==="accepted" && upcoming(v.time)).map(([iid,v])=>({iid, with:v.to.name,   court:v.court, time:v.time})),
-  ].sort((x,y)=>new Date(x.time)-new Date(y.time));
+  const matches = mmInvites.filter(i=>i.status==="accepted" && upcoming(i.play_time));
+  const pending = mmInvites.filter(i=>i.status==="new" && i.to_user===uid);
+  const waiting = mmInvites.filter(i=>i.from_user===uid && i.status!=="accepted" && now-new Date(i.created_at).getTime()<3*DAY);
 
   if(matches.length){
-    const s=el("div","mm-sub"); s.appendChild(el("h3",null, matches.length===1 ? "Confirmed match" : `Confirmed matches · ${matches.length}`));
-    for(const m of matches){
+    const s=el("div","mm-sub"); s.appendChild(el("h3",null, matches.length===1?"Confirmed match":`Confirmed matches · ${matches.length}`));
+    for(const inv of matches){
+      const other = inv.from_user===uid ? "your invite" : clean(inv.from_name,24);
+      const court = parseCourt(inv.court)||{name:"the court",lat:0,lon:0};
       const r=el("div","inv ok"), t=el("div","txt");
-      const l1=el("div"); l1.appendChild(el("b",null,fmtWhen(m.time))); l1.appendChild(document.createTextNode(` · vs ${m.with}`)); t.appendChild(l1);
-      t.appendChild(el("div","s",courtLines(m.court))); r.appendChild(t);
-      r.appendChild(mapButton(m.court, `Match vs ${m.with}`));
-      const cu=matchCalendarUrl(m.with,m.court,m.time); if(cu) r.appendChild(linkAct("Add to calendar", cu, "primary"));
-      r.appendChild(confirmButton("Cancel","Tap to cancel match",()=>cancelMatch(m.iid)));
-      s.appendChild(r);
-    }
-    box.appendChild(s);
-  }
-
-  const pending=inc.filter(([,v])=>v.status==="new").sort((x,y)=>y[1].at-x[1].at);
-  if(pending.length){
-    const s=el("div","mm-sub"); s.appendChild(el("h3",null,`Invites for you · ${pending.length}`));
-    for(const [iid,v] of pending){
-      const r=el("div","inv"), t=el("div","txt");
-      const l1=el("div"); l1.appendChild(el("b",null,v.from.name));
-      l1.appendChild(document.createTextNode([v.from.skill, v.from.place].filter(Boolean).map(x=>` · ${x}`).join("")));
+      const l1=el("div"); l1.appendChild(el("b",null,fmtWhen(inv.play_time)));
+      l1.appendChild(document.createTextNode(inv.from_user===uid ? "" : ` · vs ${other}`));
       t.appendChild(l1);
-      const dMe=S.lat!=null ? milesBetween(S.lat,S.lon,v.court.lat,v.court.lon).toFixed(1) : null;
-      t.appendChild(el("div","s",`${fmtWhen(v.time)} · ${courtLines(v.court)}${dMe?` · ${dMe} mi from you`:""}`));
-      r.appendChild(t);
-      r.appendChild(mapButton(v.court, `${v.from.name}'s invite`));
-      const no=el("button","act","Decline"); no.onclick=()=>answerInvite(iid,false); r.appendChild(no);
-      const yes=el("button","act primary","Accept"); yes.onclick=()=>answerInvite(iid,true); r.appendChild(yes);
+      t.appendChild(el("div","s",courtLines(court))); r.appendChild(t);
+      r.appendChild(mapButton(court, "Your match"));
+      const cu=matchCalendarUrl(inv.from_user===uid?"your match":other, court, isoToLocal(inv.play_time));
+      if(cu) r.appendChild(linkAct("Add to calendar", cu, "primary"));
+      r.appendChild(confirmButton("Cancel","Tap to cancel match",()=>cancelInvite(inv)));
       s.appendChild(r);
     }
     box.appendChild(s);
   }
 
-  const mineOut=out.filter(([,v])=>v.status!=="accepted" && now-v.at<3*DAY).sort((x,y)=>y[1].at-x[1].at);
-  const noticed=[...inc, ...out].filter(([,v])=>v.status==="cancelled" && v.cancelledBy==="them" && now-v.at<3*DAY);
-  if(mineOut.length || noticed.length){
-    const s=el("div","mm-sub"); s.appendChild(el("h3",null,"Updates"));
-    for(const [iid,v] of mineOut){
-      const expired = v.status==="sent" && now-v.at > MM_RELAY_TTL;
-      const state = v.status==="declined" ? "can't make it"
-                  : v.status==="cancelled" ? (v.cancelledBy==="them" ? "cancelled" : "you withdrew")
-                  : expired ? "no answer yet — their app may be closed"
-                  : "waiting for an answer";
-      const r=el("div","inv"+(v.status==="declined"||v.status==="cancelled"?" dim":"")), t=el("div","txt");
-      const l1=el("div"); l1.appendChild(el("b",null,v.to.name)); l1.appendChild(document.createTextNode(` · ${state}`)); t.appendChild(l1);
-      t.appendChild(el("div","s",`${fmtWhen(v.time)} · ${v.court.name}`)); r.appendChild(t);
-      if(v.status==="sent") r.appendChild(confirmButton("Withdraw","Tap to withdraw",()=>cancelMatch(iid)));
+  if(pending.length){
+    const s=el("div","mm-sub"); s.appendChild(el("h3",null,`Invitations for you · ${pending.length}`));
+    for(const inv of pending){
+      const court=parseCourt(inv.court)||{name:"the court",lat:0,lon:0};
+      const r=el("div","inv"), t=el("div","txt");
+      t.appendChild(el("div",null,"")).appendChild(el("b",null,clean(inv.from_name,24)||"A player"));
+      t.appendChild(el("div","s",`${fmtWhen(inv.play_time)} · ${courtLines(court)}`));
+      r.appendChild(t);
+      r.appendChild(mapButton(court,"Their suggestion"));
+      const no=el("button","act","Decline"); no.onclick=()=>answerInvite(inv,false); r.appendChild(no);
+      const yes=el("button","act primary","Accept"); yes.onclick=()=>answerInvite(inv,true); r.appendChild(yes);
       s.appendChild(r);
     }
-    for(const [,v] of noticed.filter(([iid])=>!mineOut.some(([o])=>o===iid))){
-      const who=v.from ? v.from.name : v.to.name;
-      const r=el("div","inv dim"), t=el("div","txt");
-      const l1=el("div"); l1.appendChild(el("b",null,who)); l1.appendChild(document.createTextNode(" · cancelled")); t.appendChild(l1);
-      t.appendChild(el("div","s",`${fmtWhen(v.time)} · ${v.court.name}`)); r.appendChild(t); s.appendChild(r);
+    box.appendChild(s);
+  }
+
+  if(waiting.length){
+    const s=el("div","mm-sub"); s.appendChild(el("h3",null,"Your invitations"));
+    for(const inv of waiting){
+      const court=parseCourt(inv.court)||{name:"the court",lat:0,lon:0};
+      const state = inv.status==="declined" ? "declined" : inv.status==="cancelled" ? "cancelled" : "waiting for an answer";
+      const r=el("div","inv"+(inv.status==="new"?"":" dim")), t=el("div","txt");
+      const l1=el("div"); l1.appendChild(el("b",null,fmtWhen(inv.play_time)));
+      l1.appendChild(document.createTextNode(` · ${state}`)); t.appendChild(l1);
+      t.appendChild(el("div","s",court.name)); r.appendChild(t);
+      if(inv.status==="new") r.appendChild(confirmButton("Withdraw","Tap to withdraw",()=>cancelInvite(inv)));
+      s.appendChild(r);
     }
     box.appendChild(s);
   }
 
   box.appendChild(compose);
 
-  /* --- phone push via ntfy --- */
+  /* phone alerts */
   const ph=el("details","adv mm-push");
-  ph.appendChild(el("summary",null,"Get invites on your phone even when this app is closed"));
+  ph.appendChild(el("summary",null,"Get invitations on your phone even when this app is closed"));
   const pb=el("div","body");
-  pb.appendChild(el("p","fine","Phones pause web apps in the background, so they can't alert you on their own. The free ntfy app can: install it, then subscribe to your private alert channel below. You'll get a notification for every invite, answer and cancellation."));
-  const topic=alertTopicFor(mm.reply);
+  pb.appendChild(el("p","fine","Phones pause web apps in the background, so they can't alert you on their own. The free ntfy app can: install it, then subscribe to your private channel below."));
   const row=el("div","mm-actions");
-  row.appendChild(linkAct("Open your alert channel", `https://ntfy.sh/${topic}`, "primary"));
+  row.appendChild(linkAct("Open your alert channel", `https://ntfy.sh/${mm.alertTopic}`, "primary"));
   const cp=el("button","act","Copy channel name");
-  cp.onclick=()=>{ navigator.clipboard && navigator.clipboard.writeText(topic).then(()=>toast("Copied — paste it into ntfy's Subscribe box","📋")).catch(()=>toast(topic,"📋",8000)); };
-  row.appendChild(cp);
-  pb.appendChild(row);
-  pb.appendChild(el("p","fine",`Channel: ${topic} — keep it to yourself; anyone who has it can read your alerts.`));
-  ph.appendChild(pb);
-  box.appendChild(ph);
+  cp.onclick=()=>{ navigator.clipboard && navigator.clipboard.writeText(mm.alertTopic).then(()=>toast("Copied — paste it into ntfy's Subscribe box","📋")).catch(()=>toast(mm.alertTopic,"📋",8000)); };
+  row.appendChild(cp); pb.appendChild(row);
+  pb.appendChild(el("p","fine",`Channel: ${mm.alertTopic} — keep it to yourself.`));
+  ph.appendChild(pb); box.appendChild(ph);
 }
 
 function renderBoardNow(){
   const g=$("#mmBoard"); if(!g) return;
   g.innerHTML="";
-  if(!mm.ack) return;
+  if(!canMM() || !mm.ack) return;
   mmBoard.forEach((p,i)=>g.appendChild(playerCard(p,i)));
 }
 
 function playerCard(p,idx){
   const c=el("div","tcard s-ok anim-in"); c.style.animationDelay=Math.min(idx,12)*30+"ms";
   const head=el("div","thead"); head.appendChild(el("h3",null,p.name));
-  const hide=el("button","star","✕"); hide.title="Hide this player";
-  hide.onclick=()=>{ mm.blocked.push(p.dev); saveMM(); mmBoard=mmBoard.filter(x=>x.dev!==p.dev); renderBoardNow(); toast(`${p.name} is hidden`,"✓"); };
-  head.appendChild(hide); c.appendChild(head);
+  c.appendChild(head);
 
   const tags=el("div","tags");
   if(p.skill) tags.appendChild(el("span","tag lv",p.skill));
@@ -2904,29 +2824,24 @@ function playerCard(p,idx){
 
   const dl=el("dl","facts");
   const add=(k,v)=>{ dl.appendChild(el("dt",null,k)); dl.appendChild(el("dd",null,v)); };
-  add("Distance",`${p.miles} mi · about ${Math.max(5,Math.round(p.miles/0.75))} min`);
+  if(p.miles!=null) add("Distance",`${p.miles} mi · about ${Math.max(5,Math.round(p.miles/0.75))} min`);
   if(p.place) add("Area",p.place);
-  if(p.court){
-    const dCourt=milesBetween(S.lat,S.lon,p.court.lat,p.court.lon).toFixed(1);
-    add("Court", `${p.court.name} · ${dCourt} mi from you`);
-    const extra=[courtSummary(p.court), p.court.address].filter(Boolean).join(" · ");
-    if(extra) add("Details", extra);
-  }
-  add("Posted",ago(new Date(p.at).toISOString()));
-  if(p.note) add("Note",p.note);
+  const dCourt = S.lat!=null ? milesBetween(S.lat,S.lon,p.court.lat,p.court.lon).toFixed(1) : null;
+  add("Court", p.court.name + (dCourt?` · ${dCourt} mi from you`:""));
+  const extra=[courtSummary(p.court), p.court.address].filter(Boolean).join(" · ");
+  if(extra) add("Details", extra);
+  add("Posted", ago(p.at));
+  if(p.note) add("Note", p.note);
   c.appendChild(dl);
 
-  /* Your invites to this post, whatever state they're in. */
-  const mine=Object.entries(mm.outgoing).filter(([,o])=>o.postId===p.id);
+  const mine=mmInvites.filter(i=>i.post_id===p.id && i.from_user===session.user_id);
   if(mine.length){
     const st=el("div","tags");
-    for(const [,o] of mine){
-      const expired = o.status==="sent" && Date.now()-o.at > MM_RELAY_TTL;
+    for(const o of mine){
       const [cls,txt] = o.status==="accepted" ? ["st-ok","Match on"]
                       : o.status==="declined" ? ["st-dead","Declined"]
-                      : o.status==="cancelled" ? ["st-dead","Cancelled"]
-                      : expired ? ["st-dead","No answer"] : ["st-new","Invite sent"];
-      st.appendChild(el("span","tag "+cls,`${txt} · ${fmtWhen(o.time)}`));
+                      : o.status==="cancelled" ? ["st-dead","Cancelled"] : ["st-new","Invite sent"];
+      st.appendChild(el("span","tag "+cls,`${txt} · ${fmtWhen(o.play_time)}`));
     }
     c.appendChild(st);
   }
@@ -2935,46 +2850,35 @@ function playerCard(p,idx){
   if(mmOpen===p.id){
     const close=el("button","act","Close"); close.onclick=()=>{ mmOpen=null; renderBoardNow(); }; f.appendChild(close);
   } else {
-    if(p.court){
-      const b=el("button","act primary", mine.length ? "Invite for another time" : "Invite to play here");
-      b.onclick=()=>openInvite(p);
-      f.appendChild(b);
-      f.appendChild(mapButton(p.court, `${p.name}'s court`));
-    } else {
-      /* Only posts from older versions of the app can lack a court. */
-      f.appendChild(el("span","fine","No court picked yet"));
-    }
+    const b=el("button","act primary", mine.length ? "Invite for another time" : "Invite to play here");
+    b.onclick=()=>openInvite(p); f.appendChild(b);
+    f.appendChild(mapButton(p.court, `${p.name}'s court`));
+    const rep=el("button","act","Report"); rep.onclick=()=>reportSheet(p); f.appendChild(rep);
+    const blk=confirmButton("Block","Tap to block",()=>blockUser(p.author,p.name)); f.appendChild(blk);
   }
   c.appendChild(f);
-
   if(mmOpen===p.id) c.appendChild(invitePanel(p));
   return c;
 }
 
-/* The invite panel. The poster chose the court, so inviting is simply
-   agreeing to play there and proposing a time (pre-filled from their post). */
 function openInvite(p){
-  if(!clean(mm.draft.name,24)){ toast("Fill in your display name above first — it goes on the invite","✋",4200); return; }
+  if(!canMM()) return;
   if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
-  if(!p.court){ toast(`${p.name} hasn't picked a court yet`,"✋"); return; }
   mmOpen=p.id;
-  mmFind[p.id]={ time:defaultTime(p.when,p.time) };
+  mmFind[p.id]={ time: defaultTime(p.when,p.time) };
   renderBoardNow();
 }
-
 function invitePanel(p){
-  const st=mmFind[p.id] || (mmFind[p.id]={ time:defaultTime(p.when,p.time) });
+  const st=mmFind[p.id] || (mmFind[p.id]={ time: defaultTime(p.when,p.time) });
   const w=el("div","courts");
-
   const row=el("div","court"); row.setAttribute("aria-pressed","true");
   const g=el("div","grow");
   g.appendChild(el("div","n",p.court.name));
-  const dMe=milesBetween(S.lat,S.lon,p.court.lat,p.court.lon).toFixed(1);
-  g.appendChild(el("div","d",[`${dMe} mi from you`, courtSummary(p.court), p.court.address].filter(Boolean).join(" · ")));
+  const dMe = S.lat!=null ? milesBetween(S.lat,S.lon,p.court.lat,p.court.lon).toFixed(1) : null;
+  g.appendChild(el("div","d",[dMe?`${dMe} mi from you`:null, courtSummary(p.court), p.court.address].filter(Boolean).join(" · ")));
   row.appendChild(g);
   const see=el("button","act","View on map"); see.onclick=e=>{ e.stopPropagation(); openMapView(p.court, `${p.name}'s court`); };
-  row.appendChild(see);
-  w.appendChild(row);
+  row.appendChild(see); w.appendChild(row);
 
   const a=el("div","mm-actions");
   const tf=el("div","field"); tf.appendChild(el("label",null,"When"));
@@ -2988,23 +2892,29 @@ function invitePanel(p){
     send.disabled=true; send.textContent="Sending…";
     try{
       if(await sendInvite(p, p.court, st.time)){
-        toast(`Invite sent to ${p.name} — you'll be told when they answer`,"📨",4600);
-        mmOpen=null; renderBoardNow(); renderMMNow();
+        toast(`Invitation sent to ${p.name}`,"📨",4600);
+        mmOpen=null; await mmLoad(true);
         return;
       }
-    }catch(e){ toast("Couldn't send the invite — try again","⚠️"); }
+    }catch(e){ toast(`Couldn't send (${e.message})`,"⚠️",5000); }
     send.disabled=false; send.textContent="Send invite";
   };
-  a.appendChild(send);
-  w.appendChild(a);
+  a.appendChild(send); w.appendChild(a);
   return w;
 }
 
+function matchCalendarUrl(withName, court, timeLocal){
+  const s=new Date(timeLocal); if(isNaN(s)) return null;
+  const e=new Date(s.getTime()+90*60000);
+  const z=d=>d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  return "https://calendar.google.com/calendar/render?"+new URLSearchParams({
+    action:"TEMPLATE", text:`Tennis vs ${withName}`, dates:`${z(s)}/${z(e)}`,
+    location: court.address ? `${court.name}, ${court.address}` : `${court.name} (${court.lat.toFixed(5)}, ${court.lon.toFixed(5)})`,
+    details:["Arranged through Matchmaking.", courtSummary(court), `Directions: ${directionsLink(court)}`].filter(Boolean).join("\n"),
+  });
+}
+
 /* ---------- the in-app map ---------- */
-/* One map for everything: choosing your court, and looking at the court
-   someone else offered. OpenStreetMap tiles (labelled, free, no key), softened
-   by CSS to suit the app and inverted in dark mode; Esri's street map takes
-   over if they ever fail to load. No Google anywhere. */
 let leafletReady=null;
 function loadLeaflet(){
   if(window.L) return Promise.resolve();
@@ -3021,7 +2931,6 @@ function loadLeaflet(){
   return leafletReady;
 }
 const isDark = () => S.theme==="dark" || (S.theme!=="light" && matchMedia("(prefers-color-scheme: dark)").matches);
-
 function makeMap(box, lat, lon, zoom){
   box.classList.toggle("dark", isDark());
   const map=L.map(box,{zoomControl:true, attributionControl:true}).setView([lat,lon], zoom);
@@ -3055,29 +2964,23 @@ function mapSheet(title, lede){
   document.addEventListener("keydown", function esc(ev){ if(ev.key==="Escape"){ api.close(); document.removeEventListener("keydown",esc); } });
   return api;
 }
-
-/* A small "Map" button that opens any court in the app. */
 function mapButton(court, title){
   const b=el("button","act","Map");
   b.onclick=e=>{ e.stopPropagation(); openMapView(court, title); };
   return b;
 }
-
-/* Look at a court: its pin, your ZIP area for scale, the details, and
-   turn-by-turn directions on OpenStreetMap if you want them. */
 async function openMapView(court, title){
   const s=mapSheet(title || court.name, null);
   const info=el("div","pick-card");
   info.appendChild(el("div","n",court.name));
   const dMe = S.lat!=null ? milesBetween(S.lat,S.lon,court.lat,court.lon).toFixed(1) : null;
-  const sub=[dMe ? `${dMe} mi from you` : null, courtSummary(court), court.address].filter(Boolean).join(" · ");
+  const sub=[dMe?`${dMe} mi from you`:null, courtSummary(court), court.address].filter(Boolean).join(" · ");
   if(sub) info.appendChild(el("div","d",sub));
   s.sheet.appendChild(info);
   const foot=el("div","sheet-foot");
   const dir=el("a","btn-plain","Directions"); dir.href=directionsLink(court); dir.target="_blank"; dir.rel="noopener";
   const done=el("button","btn","Done"); done.onclick=()=>s.close();
   foot.appendChild(dir); foot.appendChild(done); s.sheet.appendChild(foot);
-
   try{ await loadLeaflet(); }
   catch(e){ s.mapBox.hidden=true; info.appendChild(el("div","d","The map couldn't load right now — Directions still works.")); return; }
   const map = s.map = makeMap(s.mapBox, court.lat, court.lon, 16);
@@ -3087,9 +2990,6 @@ async function openMapView(court, title){
     map.fitBounds(L.latLngBounds([[court.lat,court.lon],[S.lat,S.lon]]).pad(0.25), {maxZoom:16});
   }
 }
-
-/* Choose your court: tap a blue dot (a mapped public court) or anywhere to
-   drop your own pin. */
 async function openCourtPicker(){
   if(S.lat==null){ toast("Set your ZIP code in Settings first","✋"); return; }
   const s=mapSheet("Choose a court","Tap a blue dot for a mapped public court, or tap anywhere on the map to drop your own pin.");
@@ -3097,18 +2997,15 @@ async function openCourtPicker(){
   const setStatus2=(t,load)=>{ status.innerHTML=""; status.appendChild(load?el("span","spin"):el("span","pip")); status.appendChild(el("span",null,t)); };
   const again=el("button","act map-again","Search this area");
   s.sheet.appendChild(again); s.sheet.appendChild(status);
-
   const card=el("div","pick-card"); card.hidden=true; s.sheet.appendChild(card);
   const nameF=el("div","field"); nameF.appendChild(el("label",null,"Name shown to players")); const nameI=inp("","e.g. Memorial Park courts",60); nameF.appendChild(nameI);
-
   const foot=el("div","sheet-foot");
   const cancel=el("button","btn-plain","Cancel");
   const use=el("button","btn","Use this court"); use.disabled=true;
   foot.appendChild(cancel); foot.appendChild(use); s.sheet.appendChild(foot);
   cancel.onclick=()=>s.close();
 
-  let chosen=null, chosenMarker=null;
-  const dots=[];
+  let chosen=null, chosenMarker=null; const dots=[];
   const choose = async (c) => {
     chosen={ name:c.name||"", lat:c.lat, lon:c.lon, n:c.n||null, lit:!!c.lit, surface:c.surface||"", address:"" };
     if(chosenMarker) chosenMarker.remove();
@@ -3126,7 +3023,6 @@ async function openCourtPicker(){
     if(!chosen.name && a.name){ chosen.name=a.name; if(!nameI.value) nameI.value=a.name; }
     sub.textContent=[courtSummary(chosen), a.address || "no street address found"].filter(Boolean).join(" · ");
   };
-
   use.onclick=()=>{
     if(!chosen) return;
     const name=clean(nameI.value,60) || chosen.name || "Tennis courts";
@@ -3138,7 +3034,6 @@ async function openCourtPicker(){
   setStatus2("Loading the map…",true);
   try{ await loadLeaflet(); }
   catch(e){ s.mapBox.hidden=true; setStatus2("The map couldn't load — check your connection and try again"); return; }
-
   const start = mm.draft.court || {lat:S.lat, lon:S.lon};
   const map = s.map = makeMap(s.mapBox, start.lat, start.lon, mm.draft.court ? 16 : 13);
   if(mm.draft.court) choose(mm.draft.court);
@@ -3179,23 +3074,15 @@ function setView(v){
   if(mmOn){
     $("#whoami").textContent=[S.place||"Set your location", `within ${S.radius} mi`].join(" · ");
     renderMMNow(); renderBoardNow();
-    if(mm.ack){ mmRefresh(); checkInbox(); }
-    else mmStatus("Read the note above and tap “I understand” to see players near you");
+    if(canMM() && mm.ack) mmLoad();
   } else render();
 }
 
-/* Keeps posts alive on the relay, checks the inbox, and refreshes the board
-   while it's on screen. Runs in the tray too, in the desktop app. */
+/* Checks for invitations every couple of minutes — in the tray too. */
 async function mmTick(){
-  const now=Date.now();
-  const before=mm.posts.length;
-  mm.posts=mm.posts.filter(p=>p.exp>now);
-  if(mm.posts.length!==before){ saveMM(); if(S.view==="mm") renderMM(); }
-  for(const p of mm.posts){
-    if(now-p.lastPublished > MM_KEEPALIVE){ try{ await publishPost(p); saveMM(); }catch(e){} }
-  }
-  await checkInbox();
-  if(S.view==="mm" && document.visibilityState==="visible" && mm.ack) mmRefresh();
+  if(!canMM() || !mm.ack) return;
+  const visible = S.view==="mm" && document.visibilityState==="visible";
+  if(visible || Date.now()-mmLastAt > MM_POLL){ mmLastAt=Date.now(); await mmLoad(true); }
 }
 
 /* ---------------- boot ---------------- */
