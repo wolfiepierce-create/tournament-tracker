@@ -29,7 +29,7 @@ $today = (Get-Date).ToUniversalTime().ToString("MM/dd/yyyy")
 $base  = "${api}?showTennisContent=true&showPickleballContent=false" +
          "&distance=1600mi&pin=39.5,-98.35" +
          "&range=eventSchedule.eventStartUtc%3E$([uri]::EscapeDataString($today))"
-$headers = @{ "User-Agent" = "JuniorTournamentTracker/1.3 (personal use)"; "Accept" = "application/json" }
+$headers = @{ "User-Agent" = "TournamentTracker/1.3 (personal use)"; "Accept" = "application/json" }
 
 function Get-Utc([object]$v) {
     # UTR sends UTC times without a zone marker; make that explicit.

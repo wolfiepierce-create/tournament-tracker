@@ -7,7 +7,7 @@ using Microsoft.Web.WebView2.WinForms;
 namespace TournamentTracker;
 
 /// <summary>
-/// Desktop shell for the Junior Tournament Tracker.
+/// Desktop shell for the Tournament Tracker.
 ///
 /// Why this exists rather than just opening index.html in a browser:
 ///
@@ -25,6 +25,7 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        MigrateOldDataFolder();
 
         // "Tournament Tracker.exe --selftest" boots the page, reports whether the
         // browser environment can actually raise notifications, and quits. Useful
@@ -36,7 +37,7 @@ internal static class Program
         }
 
         // One instance only - a second launch just re-opens the existing window.
-        using var mutex = new Mutex(true, @"Local\JuniorTournamentTracker", out bool isFirst);
+        using var mutex = new Mutex(true, @"Local\TournamentTracker", out bool isFirst);
         if (!isFirst)
         {
             NativeSingleInstance.PokeExistingInstance();
@@ -44,6 +45,24 @@ internal static class Program
         }
 
         Application.Run(new MainForm());
+    }
+
+    /// <summary>
+    /// The app used to store its settings under "JuniorTournamentTracker". Renaming
+    /// it would otherwise silently lose the ZIP code, filters and saved tournaments,
+    /// so the old folder is carried over the first time the renamed build runs.
+    /// </summary>
+    private static void MigrateOldDataFolder()
+    {
+        try
+        {
+            string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string from = Path.Combine(local, "JuniorTournamentTracker");
+            string to   = Path.Combine(local, "TournamentTracker");
+            if (!Directory.Exists(from) || Directory.Exists(to)) return;
+            Directory.Move(from, to);
+        }
+        catch { /* a failed move just means a fresh setup, never a crash */ }
     }
 }
 
@@ -66,7 +85,7 @@ internal static class NativeSingleInstance
 
 internal sealed class MainForm : Form
 {
-    public const string WindowTitle = "Junior Tournament Tracker";
+    public const string WindowTitle = "Tournament Tracker";
 
     // WebView2 maps this name to a folder we control. It must NOT be a ".local"
     // name - that suffix is reserved for mDNS, so the runtime tries to resolve it
@@ -145,7 +164,7 @@ internal sealed class MainForm : Form
     private static HttpClient CreateHttp()
     {
         var c = new HttpClient { Timeout = TimeSpan.FromSeconds(45) };
-        c.DefaultRequestHeaders.UserAgent.ParseAdd("JuniorTournamentTracker/1.3 (personal use)");
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("TournamentTracker/1.3 (personal use)");
         c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         return c;
     }
@@ -246,7 +265,7 @@ internal sealed class MainForm : Form
     {
         string profile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "JuniorTournamentTracker", "profile");
+            "TournamentTracker", "profile");
         Directory.CreateDirectory(profile);
 
         CoreWebView2Environment env;
@@ -568,7 +587,7 @@ internal sealed class MainForm : Form
     /// </summary>
     private static string RestorePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "JuniorTournamentTracker", "settings.json");
+        "TournamentTracker", "settings.json");
 
     private void SaveRestoreBlob(string json)
     {
@@ -637,7 +656,7 @@ internal sealed class MainForm : Form
 
     private static string GeometryPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "JuniorTournamentTracker", "window.json");
+        "TournamentTracker", "window.json");
 
     private sealed class Geometry
     {

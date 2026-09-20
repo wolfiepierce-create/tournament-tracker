@@ -11,9 +11,9 @@
     <AssemblyName>Tournament Tracker</AssemblyName>
     <RootNamespace>TournamentTracker</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.6.0</Version>
-    <Product>Junior Tournament Tracker</Product>
-    <Company>Junior Tournament Tracker</Company>
+    <Version>1.7.2</Version>
+    <Product>Tournament Tracker</Product>
+    <Company>Tournament Tracker</Company>
 
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
@@ -37,5 +37,7 @@
   </ItemGroup>
 
 </Project>
+
+
 
 

@@ -73,14 +73,14 @@ jobs:
         run: |
           $tag = "${{ github.event.inputs.tag || github.ref_name }}"
           $notes = @"
-**Junior Tournament Tracker $tag** - Windows desktop app. Nothing to install; just run it.
+**Tournament Tracker $tag** - Windows desktop app. Nothing to install; just run it.
 
 ### First run: Windows will warn you
 This app isn't code-signed yet, so Windows shows **"Windows protected your PC"**.
 Click **More info**, then **Run anyway**. It only happens once.
 
 ### What it does
-Finds junior tennis tournaments near you from USTA and UTR, alerts you before entry
+Finds tennis tournaments near you from USTA and UTR, alerts you before entry
 deadlines close, and adds them to Google Calendar. Matchmaking finds someone nearby to hit with.
 
 Not affiliated with, endorsed by, or connected to the USTA or UTR. Always confirm

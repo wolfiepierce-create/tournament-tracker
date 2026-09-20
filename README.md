@@ -1,16 +1,16 @@
-# Junior Tournament Tracker
+# Tournament Tracker
 
 Finds tennis tournaments near you from **USTA** or **UTR**, shows the entry deadline,
 dates and fee, tells you when new ones are posted, nags you before registration closes,
-and drops any tournament straight into Google Calendar. **Matchmaking** finds someone
-nearby to play and a court that's fair for both of you.
+and drops any tournament straight into Google Calendar. **Matchmaking** posts that you are
+free to hit, and other players nearby ask you for a time at the court you picked.
 
 Two ways to run it:
 
 | | |
 |---|---|
-| **`dist/Tournament Tracker.exe`** | The real app. Desktop window + system tray. **Alerts only work here.** |
-| **`index.html`** | The same app as a web page — for your phone, or any other computer. |
+| **the web page** | What everyone else uses: [wolfiepierce-create.github.io/tournament-tracker](https://wolfiepierce-create.github.io/tournament-tracker/). Works on a phone home screen. |
+| **`dist/Tournament Tracker.exe`** | Your own desktop copy. Window + system tray, keeps watching deadlines while closed. |
 
 ---
 
@@ -271,7 +271,7 @@ Everything you set up — ZIP code, birth year, gender, division, level filters,
 theme, alert preference and your starred tournaments — is written to:
 
 ```
-%LOCALAPPDATA%\JuniorTournamentTracker\settings.json
+%LOCALAPPDATA%\TournamentTracker\settings.json
 ```
 
 That file sits **outside** the app and outside the browser storage the page normally uses,
