@@ -1,4 +1,4 @@
-**Tournament Tracker {{tag}}** — Windows desktop app. Nothing to install; just run it.
+**Tennis Agenda {{tag}}** — Windows desktop app. Nothing to install; just run it.
 
 ### First run: Windows will warn you
 This app isn't code-signed, so Windows shows **"Windows protected your PC"**.

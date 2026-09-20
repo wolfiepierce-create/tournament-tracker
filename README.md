@@ -1,4 +1,4 @@
-# Tournament Tracker
+# Tennis Agenda
 
 Finds tennis tournaments near you from **USTA** or **UTR**, shows the entry deadline,
 dates and fee, tells you when new ones are posted, nags you before registration closes,
@@ -10,14 +10,14 @@ Two ways to run it:
 | | |
 |---|---|
 | **the web page** | What everyone else uses: [tennisagenda.com](https://tennisagenda.com/). Works on a phone home screen. |
-| **`dist/Tournament Tracker.exe`** | Your own desktop copy. Window + system tray, keeps watching deadlines while closed. |
+| **`dist/Tennis Agenda.exe`** | Your own desktop copy. Window + system tray, keeps watching deadlines while closed. |
 
 ---
 
 ## The desktop app
 
-Double-click **`dist/Tournament Tracker.exe`**. Nothing to install — .NET and the browser
-engine are baked in, so it's one 63 MB file you can copy anywhere. A **Tournament Tracker**
+Double-click **`dist/Tennis Agenda.exe`**. Nothing to install — .NET and the browser
+engine are baked in, so it's one 63 MB file you can copy anywhere. A **Tennis Agenda**
 shortcut is already in your Start menu.
 
 **Closing the window doesn't quit it.** It parks in the system tray (bottom-right, near the
@@ -58,7 +58,7 @@ buried.
 If alerts ever misbehave, run this and it'll tell you what the page environment looks like:
 
 ```bash
-"C:\Users\User\OneDrive\Documents\Tournament Tracker v.1\dist\Tournament Tracker.exe" --selftest
+"C:\Users\User\OneDrive\Documents\Tennis Agenda v.1\dist\Tennis Agenda.exe" --selftest
 ```
 
 ---
@@ -252,7 +252,7 @@ The site is deployed by the GitHub Action in `.github/workflows/pages.yml`, whic
 every push to `main` and every 3 hours (to refresh the UTR snapshot). To publish a change:
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git add index.html && git commit -m "Update tracker" && git push
+cd "C:/Users/User/OneDrive/Documents/Tennis Agenda v.1" && git add index.html && git commit -m "Update tracker" && git push
 ```
 
 On your phone open that URL and:
@@ -275,7 +275,7 @@ theme, alert preference and your starred tournaments — is written to:
 ```
 
 That file sits **outside** the app and outside the browser storage the page normally uses,
-so you can replace `Tournament Tracker.exe` with a newer build, or clear browser data, and
+so you can replace `Tennis Agenda.exe` with a newer build, or clear browser data, and
 the app picks straight up where it left off. Verified by wiping all browser storage and
 relaunching: the ZIP code and all starred tournaments came back.
 
@@ -290,7 +290,7 @@ If you ever want a genuinely clean start, delete that folder.
 The web app is embedded in the executable, so after editing `index.html`:
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1/desktop" && dotnet publish -c Release -o ../dist
+cd "C:/Users/User/OneDrive/Documents/Tennis Agenda v.1/desktop" && dotnet publish -c Release -o ../dist
 ```
 
 The page is served from memory inside the exe, so a rebuild always ships the current HTML —

@@ -1,6 +1,6 @@
 {
-  "name": "Tournament Tracker",
-  "short_name": "Tournaments",
+  "name": "Tennis Agenda",
+  "short_name": "Tennis Agenda",
   "description": "Tennis tournaments near you, entry deadlines, and players to hit with.",
   "start_url": "./",
   "scope": "./",

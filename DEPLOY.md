@@ -44,11 +44,11 @@ Open a terminal in the project folder and run these two commands, replacing
 `YOUR-USERNAME` with your actual GitHub username:
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git remote add origin https://github.com/YOUR-USERNAME/tournament-tracker.git
+cd "C:/Users/User/OneDrive/Documents/Tennis Agenda v.1" && git remote add origin https://github.com/YOUR-USERNAME/tournament-tracker.git
 ```
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git push -u origin main
+cd "C:/Users/User/OneDrive/Documents/Tennis Agenda v.1" && git push -u origin main
 ```
 
 **About the sign-in prompt.** GitHub stopped accepting account passwords for pushes years
@@ -106,7 +106,7 @@ Each device keeps its own settings, so set your ZIP and birth year once on the p
 Whenever you change `index.html`:
 
 ```bash
-cd "C:/Users/User/OneDrive/Documents/Tournament Tracker v.1" && git add index.html && git commit -m "Update tracker" && git push
+cd "C:/Users/User/OneDrive/Documents/Tennis Agenda v.1" && git add index.html && git commit -m "Update tracker" && git push
 ```
 
 Pages rebuilds within a minute. Your phone picks up the new version on next open — you
@@ -118,7 +118,7 @@ never reinstall the home-screen icon, and your saved settings are untouched.
 
 **The .exe isn't in the repo.** It's 63 MB, and Pages doesn't need it — `.gitignore`
 excludes `dist/`. If you want it downloadable, attach it to a **Release**: repository →
-**Releases** → **Create a new release** → drag `dist/Tournament Tracker.exe` into the
+**Releases** → **Create a new release** → drag `dist/Tennis Agenda.exe` into the
 binaries box. GitHub allows up to 2 GB per release file.
 
 **Desktop and phone don't share settings.** They're separate browsers on separate devices,

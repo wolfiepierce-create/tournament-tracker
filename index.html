@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tournament Tracker</title>
+<title>Tennis Agenda</title>
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tournaments">
+<meta name="apple-mobile-web-app-title" content="Tennis Agenda">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -472,6 +472,13 @@ header.nav{
 .sheet .lede{color:var(--ink-2);font-size:14px;margin:0 0 22px}
 .sheet .field{margin-bottom:15px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.row3{display:grid;grid-template-columns:1.25fr .75fr .8fr;gap:9px}
+.intro .pts{list-style:none;margin:0 0 18px;padding:0;display:grid;gap:13px}
+.intro .pts li{font-size:14px;line-height:1.5;color:var(--ink-2);padding-left:21px;position:relative}
+.intro .pts li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.intro .pts strong{color:var(--ink);font-weight:600}
+.intro .goal{font-size:14px;line-height:1.5;color:var(--ink-2);margin:0;padding:14px 16px;background:var(--surface-2);border-radius:12px}
+.intro .sheet-foot .btn{width:100%}
 @media (max-width:480px){ .row2{grid-template-columns:1fr} }
 .hint{
   font-size:12.5px;color:var(--ink-2);background:var(--surface-2);
@@ -636,7 +643,7 @@ footer.foot{
 "use strict";
 
 /* ============================================================
-   Tournament Tracker
+   Tennis Agenda
    Single file. Runs in a browser or inside the desktop app.
    Data: public USTA "unified-search-api" (CORS-open, no login).
    ============================================================ */
@@ -834,6 +841,17 @@ async function geocode(zip){
   const j=await r.json(), p=j.places&&j.places[0];
   if(!p) throw new Error("ZIP not found");
   return {lat:+p.latitude, lon:+p.longitude, place:`${p["place name"]}, ${p["state abbreviation"]}`};
+}
+
+/* The ZIP offered at sign-up is the same setting the first-run screen asks
+   for, so it is kept in one place - the settings that already sync - instead
+   of being copied onto the account where the two could drift apart. */
+async function adoptZip(zip){
+  if(!/^\d{5}$/.test(zip) || zip === S.zip) return;
+  try{
+    const g = await geocode(zip);
+    S.zip=zip; S.lat=g.lat; S.lon=g.lon; S.place=g.place; saveS();
+  }catch(e){ /* a ZIP that will not resolve must never fail the sign-up */ }
 }
 
 /* ---------------- fetch USTA ---------------- */
@@ -1509,6 +1527,41 @@ function render(){
 /* ============================================================
    Settings
    ============================================================ */
+/* ============================================================
+   First run
+   ============================================================
+   Someone arriving from a link has no idea what this is, and the first thing
+   they used to meet was a box asking for their ZIP code - a form to fill in
+   before being given any reason to. This says what the app is for first, and
+   is shown once. */
+function openIntro(next){
+  const scrim=el("div","scrim"), m=el("div","sheet intro");
+  m.innerHTML=`
+    <h2>Welcome to Tennis Agenda</h2>
+    <p class="lede">Everything tennis where you live, in one place: the tournaments worth entering, and the people worth playing.</p>
+    <ul class="pts">
+      <li><strong>Tournaments near you.</strong> USTA and UTR events inside your driving range, with the entry deadline, the fee and how many players have already entered.</li>
+      <li><strong>Never miss a deadline.</strong> You get told 7, 3 and 1 days before entries close &mdash; and again whenever a new tournament is posted nearby.</li>
+      <li><strong>Someone to hit with.</strong> Say when you are free and pick the court; players nearby ask you for a time. 18 and over.</li>
+    </ul>
+    <p class="goal">The goal is to stop tennis being a research project. Less time hunting through websites for tournaments and hitting partners, more time on court.</p>
+    <div class="sheet-foot"><button class="btn" id="iGo">Get started</button></div>
+    <p class="fine" style="margin-top:14px">Free to use, and not affiliated with the USTA or UTR. Always confirm dates, fees and deadlines on the official tournament page before paying.</p>`;
+  scrim.appendChild(m); document.body.appendChild(scrim);
+  const go=m.querySelector("#iGo"); go.focus();
+  go.onclick=()=>{
+    LS.set("jtt.seenIntro", 1);
+    scrim.style.animation="fadeIn .25s var(--ease-soft) reverse both";
+    setTimeout(()=>{ scrim.remove(); if(next) next(); },230);
+  };
+}
+
+/* The intro comes first, then the two questions that actually set the app up. */
+function startOnboarding(){
+  if(LS.get("jtt.seenIntro",0)) return openSettings(true);
+  openIntro(()=>openSettings(true));
+}
+
 function openSettings(force){
   const scrim=el("div","scrim"), m=el("div","sheet");
   const yr=new Date().getFullYear();
@@ -1778,7 +1831,7 @@ const cacheKey = src => "jtt.cache."+src + (src==="usta" ? "."+divCategory(activ
 let searching=false;
 
 async function search(opts){
-  if(!S.zip||S.lat==null){ openSettings(true); return; }
+  if(!S.zip||S.lat==null){ startOnboarding(); return; }
   if(searching) return;
   searching=true;
   const quiet = opts && opts.background;
@@ -2151,12 +2204,30 @@ function accountForm(mode, host){
   const field = (label, node) => { const w = el("div","field wide"); w.appendChild(el("label",null,label)); w.appendChild(node); f.appendChild(w); return node; };
   const note = el("div","hint");
 
-  let userI, emailI, passI, dobI;
+  let userI, emailI, passI, zipI, dobY, dobM, dobD;
   if(mode === "signup" || mode === "username") userI  = field("Username", inp("", "shown to other players", 20));
   if(mode === "rename")                        userI  = field("Display name", inp(profile.display_name||"", "", 24));
   if(mode === "signup" || mode === "signin")   emailI = field("Email", (()=>{ const i=inp("", mode==="signup" ? "only used to reset your password" : "", 120); i.type="email"; i.autocomplete="email"; return i; })());
   if(mode === "signup" || mode === "signin")   passI  = field("Password", (()=>{ const i=inp("", mode==="signup" ? "at least 8 characters" : "", 72); i.type="password"; i.autocomplete=mode==="signup"?"new-password":"current-password"; return i; })());
-  if(mode === "signup"){ dobI = field("Date of birth", (()=>{ const i=inp("","",10); i.type="date"; return i; })()); }
+  if(mode === "signup"){
+    zipI = field("Home ZIP code", inp(S.zip||"", "so tournaments are there the moment you sign in", 5));
+
+    /* Date of birth decides the 18-and-over gate on Matchmaking, so it has to
+       be the real one. The year is already known from the first-run screen and
+       arrives filled in; the rest is asked for rather than defaulted, because
+       a prefilled whole date would let someone through that gate on a value
+       they never actually chose. */
+    const w = el("div","field wide");
+    w.appendChild(el("label",null,"Date of birth"));
+    const r3 = el("div","row3");
+    const MONTHS = ["January","February","March","April","May","June",
+                    "July","August","September","October","November","December"];
+    dobM = sel([["","Month"]].concat(MONTHS.map((nm,i)=>[String(i+1).padStart(2,"0"), nm])), "");
+    dobD = sel([["","Day"]].concat(Array.from({length:31},(_,i)=>[String(i+1).padStart(2,"0"), String(i+1)])), "");
+    dobY = inp(S.birthYear ? String(S.birthYear) : "", "Year", 4);
+    r3.appendChild(dobM); r3.appendChild(dobD); r3.appendChild(dobY);
+    w.appendChild(r3); f.appendChild(w);
+  }
 
   box.appendChild(f);
   box.appendChild(note);
@@ -2168,8 +2239,16 @@ function accountForm(mode, host){
     go.disabled = true;
     try{
       if(mode === "signup"){
-        LS.set("jtt.pendingDob", dobI.value);
-        await accountSignUp({ username:userI.value, email:emailI.value, password:passI.value, dob:dobI.value });
+        const yv = dobY.value.trim();
+        if(!/^\d{4}$/.test(yv) || !dobM.value || !dobD.value) throw new Error("Pick your full date of birth");
+        const dob = `${yv}-${dobM.value}-${dobD.value}`;
+        /* Written into the settings before signing up, so the sync that runs at
+           the end of sign-up carries them up instead of overwriting them. */
+        S.birthYear = parseInt(yv,10); saveS();
+        await adoptZip(zipI.value.trim());
+        LS.set("jtt.pendingDob", dob);
+        await accountSignUp({ username:userI.value, email:emailI.value, password:passI.value, dob });
+        syncControls(); if(S.lat!=null) search();
         toast(`Welcome, ${profile.display_name}`,"👋");
       } else if(mode === "signin"){
         await accountSignIn(emailI.value, passI.value);
@@ -3164,7 +3243,7 @@ async function mmTick(){
     render();
     setStatus(`Saved results from ${new Date(cache.at).toLocaleString()} — refreshing…`,"load");
   }
-  if(!S.zip||S.lat==null) openSettings(true); else search();
+  if(!S.zip||S.lat==null) startOnboarding(); else search();
   setView(S.view);
   setTimeout(mmTick, 4000);                 // pick up any invites that arrived while closed
 })();

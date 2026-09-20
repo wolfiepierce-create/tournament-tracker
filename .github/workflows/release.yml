@@ -63,8 +63,8 @@ jobs:
       - id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: Tournament-Tracker-exe
-          path: dist/Tournament Tracker.exe
+          name: Tennis-Agenda-exe
+          path: dist/Tennis Agenda.exe
 
       # The notes live in their own file because a PowerShell here-string cannot
       # be used here: its closing "@ has to sit at column 0, which breaks out of
@@ -77,4 +77,4 @@ jobs:
           $tag = "${{ github.event.inputs.tag || github.ref_name }}"
           $notes = (Get-Content .github/release-notes.md -Raw).Replace("{{tag}}", $tag)
           Set-Content notes.md $notes -Encoding utf8
-          gh release create $tag "dist/Tournament Tracker.exe" --title "Tournament Tracker $tag" --notes-file notes.md
+          gh release create $tag "dist/Tennis Agenda.exe" --title "Tennis Agenda $tag" --notes-file notes.md

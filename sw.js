@@ -1,4 +1,4 @@
-/* Service worker for the Tournament Tracker web app.
+/* Service worker for the Tennis Agenda web app.
 
    It exists for one reason: phones only allow a web page to show a
    notification through a service worker (`new Notification()` throws on

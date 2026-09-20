@@ -8,12 +8,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
 
-    <AssemblyName>Tournament Tracker</AssemblyName>
-    <RootNamespace>TournamentTracker</RootNamespace>
+    <AssemblyName>Tennis Agenda</AssemblyName>
+    <RootNamespace>TennisAgenda</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.8.1</Version>
-    <Product>Tournament Tracker</Product>
-    <Company>Tournament Tracker</Company>
+    <Version>1.9.0</Version>
+    <Product>Tennis Agenda</Product>
+    <Company>Tennis Agenda</Company>
 
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
