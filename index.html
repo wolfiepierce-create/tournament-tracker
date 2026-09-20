@@ -2242,6 +2242,15 @@ function accountForm(mode, host){
         const yv = dobY.value.trim();
         if(!/^\d{4}$/.test(yv) || !dobM.value || !dobD.value) throw new Error("Pick your full date of birth");
         const dob = `${yv}-${dobM.value}-${dobD.value}`;
+        /* Every month offers 31 days, and JavaScript quietly rolls an
+           impossible one forward: new Date("2006-02-31") is the 3rd of March,
+           not an error. Checking the parts survive the round trip is what
+           actually catches it. The "T00:00:00" matters too - a bare date
+           string is read as UTC, which lands on the previous day everywhere
+           west of Greenwich. */
+        const dt = new Date(`${dob}T00:00:00`);
+        if(isNaN(dt) || dt.getMonth()+1 !== +dobM.value || dt.getDate() !== +dobD.value)
+          throw new Error("That date does not exist - check the month and day");
         /* Written into the settings before signing up, so the sync that runs at
            the end of sign-up carries them up instead of overwriting them. */
         S.birthYear = parseInt(yv,10); saveS();
