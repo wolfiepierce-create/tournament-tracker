@@ -305,7 +305,7 @@ header.nav{
 
 /* Court picker */
 .map-sheet{max-width:640px}
-.map-sheet .map{height:min(46vh,380px);border-radius:16px;overflow:hidden;margin:4px 0 10px;
+.map-sheet .map{height:min(46vh,380px);height:min(46dvh,380px);border-radius:16px;overflow:hidden;margin:4px 0 10px;
   background:var(--surface-2);border:1px solid var(--line)}
 .map-sheet .map-again{margin-bottom:8px}
 .map-sheet .mm-status{margin:0 0 12px}
@@ -422,6 +422,8 @@ header.nav{
 
 .facts{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:13.5px;margin:0}
 .facts dt{color:var(--ink-3);font-weight:500}
+/* Long court names and addresses wrap instead of stretching the card. */
+.facts dd,.tcard h3,.court-chip .n,.court-chip .d,.inv .txt,.court .n,.court .d,.pick-card .n,.pick-card .d{overflow-wrap:break-word;min-width:0}
 .facts dd{margin:0;color:var(--ink);font-weight:450}
 .dl-hot{color:var(--hot);font-weight:600}
 .dl-warn{color:var(--warn);font-weight:600}
@@ -448,7 +450,10 @@ header.nav{
    Modal
    ============================================================ */
 .scrim{
-  position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;
+  position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:16px;
+  /* dvh shrinks as a phone browser shows its address bar; vh doesn't, which is
+     what pushed sheet buttons off the bottom of the screen on a real phone. */
+  height:100vh;height:100dvh;
   background:rgba(0,0,0,.4);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   animation:fadeIn .3s var(--ease-soft) both;
@@ -457,7 +462,7 @@ header.nav{
 .sheet{
   background:var(--surface);border:1px solid var(--line);border-radius:26px;
   box-shadow:var(--shadow-pop);max-width:460px;width:100%;padding:28px;
-  max-height:88vh;overflow:auto;
+  max-height:88vh;max-height:88dvh;overflow:auto;overscroll-behavior:contain;
   animation:sheetIn .5s var(--ease) both;
 }
 @keyframes sheetIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
@@ -493,7 +498,7 @@ details.adv .body{padding-top:14px}
    Toasts
    ============================================================ */
 .toasts{
-  position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+  position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));transform:translateX(-50%);
   z-index:120;display:flex;flex-direction:column;gap:9px;align-items:center;
   pointer-events:none;width:calc(100% - 32px);max-width:420px;
 }
@@ -1437,7 +1442,7 @@ function render(){
       ? "Add your ZIP code and press Refresh."
       : utr
         ? `${ALL.length} UTR events are nearby, but none fit these filters. Try more UTR levels, turn off “Juniors only” or “Open for entry”, or look further ahead.`
-        : `${ALL.length} junior tournaments are nearby, but none fit ${divWords(div)} with these filters. Try more levels, turn off “Open for entry”, or look further ahead.`));
+        : `${ALL.length} tournaments are nearby, but none fit ${divWords(div)} with these filters. Try more levels, turn off “Open for entry”, or look further ahead.`));
     box.appendChild(e);
   } else {
     const frag=document.createDocumentFragment();
@@ -1464,7 +1469,7 @@ function openSettings(force){
   m.innerHTML=`
     <h2>${force?"Welcome":"Settings"}</h2>
     <p class="lede">${force
-      ? "Two details and I'll start tracking junior tournaments near you."
+      ? "Two details and I'll start tracking tournaments near you."
       : "Your division updates itself each year from your birth year."}</p>
 
     <div class="field">
@@ -1561,7 +1566,10 @@ function openSettings(force){
     const bad=t=>{ note.textContent=t; note.classList.add("bad"); };
 
     if(!/^\d{5}$/.test(zip)) return bad("Please enter a 5-digit US ZIP code.");
-    if(y && (y<yr-25||y>yr)) return bad("That birth year doesn't look right.");
+    /* Only refuse the genuinely impossible: older than 100, or not yet born.
+       This used to cap at 25 years, from when the app was junior-only, which
+       locked out every parent who tried to set themselves up. */
+    if(y && (y<yr-100||y>yr)) return bad("That birth year doesn't look right.");
 
     S.gender=m.querySelector("#sGender").value;
     S.theme=m.querySelector("#sTheme").value;
@@ -1929,7 +1937,8 @@ async function accountSignUp({username, email, password, dob}){
   if((password||"").length < 8) throw new Error("Password must be at least 8 characters");
   if(!dob || isNaN(new Date(dob))) throw new Error("Enter your date of birth");
   const age = yearsSince(dob);
-  if(age < 5 || age > 100) throw new Error("That date of birth doesn't look right");
+  if(age < 0) throw new Error("That date of birth is in the future");
+  if(age > 100) throw new Error("That date of birth doesn't look right");
 
   const out = await sbFetch("/auth/v1/signup",
     { method:"POST", body: JSON.stringify({ email, password }) }, false);
@@ -2458,6 +2467,11 @@ async function sendInvite(post, court, timeLocal){
   pushTo(post.alertTopic, `${profile.display_name} wants to play`, `${fmtWhen(timeLocal)} at ${court.name}`);
   suggestAlerts();
   mmSeen[row[0].id]="new"; LS.set("jtt.mmSeen",mmSeen);
+  /* Remember where to reach them if I later withdraw: the invitation row only
+     carries my own alert channel, not theirs. */
+  mm.postTopics = mm.postTopics || {};
+  mm.postTopics[row[0].id] = post.alertTopic || "";
+  saveMM();
   return true;
 }
 async function answerInvite(inv, ok){
@@ -2477,7 +2491,7 @@ async function cancelInvite(inv){
     await sbAuthed(`/rest/v1/invites?id=eq.${inv.id}`, { method:"PATCH", body: JSON.stringify({ status:"cancelled" }) });
   }catch(e){ toast("Couldn't cancel — try again","⚠️"); return; }
   /* Tell whichever side wasn't me. */
-  const topic = mine ? inv.postAlertTopic : inv.alert_topic;
+  const topic = mine ? (mm.postTopics||{})[inv.id] : inv.alert_topic;
   pushTo(topic, wasConfirmed ? `${profile.display_name} cancelled your match` : `${profile.display_name} withdrew their invite`,
          `${fmtWhen(inv.play_time)} at ${(inv.court||{}).name||"the court"}`);
   toast(wasConfirmed ? "Match cancelled — they've been told" : "Invite withdrawn","✓",4200);
@@ -2487,6 +2501,14 @@ async function cancelInvite(inv){
 /* What changed since we last looked? */
 function noticeInviteChanges(){
   const events=[];
+  /* First look on a new device: adopt whatever is already there quietly instead
+     of announcing every outstanding invitation at once. */
+  const firstLook = Object.keys(mmSeen).length===0 && mmInvites.length>0;
+  if(firstLook){
+    for(const inv of mmInvites) mmSeen[inv.id]=inv.status;
+    LS.set("jtt.mmSeen", mmSeen);
+    return;
+  }
   for(const inv of mmInvites){
     const was=mmSeen[inv.id], now=inv.status;
     if(was===now) continue;
@@ -2503,6 +2525,7 @@ function noticeInviteChanges(){
   }
   const live=new Set(mmInvites.map(i=>i.id));
   for(const k of Object.keys(mmSeen)) if(!live.has(k)) delete mmSeen[k];
+  if(mm.postTopics){ for(const k of Object.keys(mm.postTopics)) if(!live.has(k)) delete mm.postTopics[k]; }
   LS.set("jtt.mmSeen", mmSeen);
   for(const [t,b] of events){ try{ alertMM(t,b); }catch(e){} }
 }
