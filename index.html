@@ -4104,16 +4104,24 @@ function tkExpenses(host){
     const qs = tkSection(host, "Quick add");
     const chips = el("div","tk-chips");
     for(const p of presets){
+      /* Removal is its own button, not a long-press: iOS Safari answers a
+         long press with its own text callout rather than a contextmenu
+         event, so the gesture we advertised would often do nothing. */
+      const wrap = el("span","tk-chipwrap");
       const c = el("button","tk-chip", p.label + "  " + tkMoney(p.amount));
       c.onclick = () => {
         tkPut("expenses", { date: tkToday(), category: p.category, amount: p.amount, note: p.label });
         toast(p.label + " logged","✅"); renderTracker();
       };
-      c.oncontextmenu = e => { e.preventDefault(); tkDrop("presets", p.id); renderTracker(); };
-      chips.appendChild(c);
+      const cx = el("button","tk-chipx","×");
+      cx.title = "Remove this quick add";
+      cx.setAttribute("aria-label","Remove the " + p.label + " quick add");
+      cx.onclick = () => { tkDrop("presets", p.id); renderTracker(); };
+      wrap.appendChild(c); wrap.appendChild(cx);
+      chips.appendChild(wrap);
     }
     qs.appendChild(chips);
-    qs.appendChild(el("p","fine","Tap to log one instantly. Long-press or right-click a chip to remove it."));
+    qs.appendChild(el("p","fine","Tap one to log it instantly."));
   }
 
   const month = tkMonth(tkToday());
