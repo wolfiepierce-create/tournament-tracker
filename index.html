@@ -2237,6 +2237,19 @@ async function syncPush(){
   if(!signedIn() || syncing) return;
   syncing = true;
   try{
+    /* Read before writing, always. This device may not have pulled since it
+       signed in, so its Tracker can be stale or empty - and the upload below
+       replaces the whole stored row. Pushing blind is how an empty desktop
+       erased the entries logged on a phone. If the read fails we do not
+       write at all: never overwrite what we have not seen. */
+    let rows;
+    try{ rows = await sbAuthed(`/rest/v1/user_data?user_id=eq.${session.user_id}&select=data`); }
+    catch(e){ return; }
+    const remote = rows && rows[0] && rows[0].data;
+    if(remote && remote["jtt.tracker"]){
+      mergeTracker(remote["jtt.tracker"]); persist();
+      if(S.view==="track") renderTracker();
+    }
     const data = localBundle();
     await sbAuthed("/rest/v1/user_data",
       { method:"POST", headers:{ Prefer:"resolution=merge-duplicates" },
@@ -2248,7 +2261,7 @@ async function syncPush(){
 const syncSoon = () => { if(!signedIn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncPush, 3000); };
 
 /* On sign-in, whichever copy is newer wins. */
-async function syncAfterSignIn(){
+async function syncAfterSignIn(quiet){
   if(!signedIn()) return;
   let rows;
   try{ rows = await sbAuthed(`/rest/v1/user_data?user_id=eq.${session.user_id}&select=data`); }
@@ -2262,7 +2275,7 @@ async function syncAfterSignIn(){
     applyBundle(remote);
     LS.set("jtt.syncAt", remote.at);
     syncControls(); render();
-    toast("Your setup was restored from your account","☁️",4200);
+    if(!quiet) toast("Your setup was restored from your account","☁️",4200);
     if(S.lat != null) search();
   }
   await syncPush();                  /* the merged tracker goes back up either way */
@@ -4288,6 +4301,17 @@ async function mmTick(){
   if(!S.zip||S.lat==null) startOnboarding(); else search();
   setView(S.view);
   setTimeout(mmTick, 4000);                 // pick up any invites that arrived while closed
+  /* A device used to pull from the account only at the moment of signing in,
+     and never again - so anything logged elsewhere afterwards simply never
+     arrived. Pull on every launch, and whenever the app comes back to the
+     front (at most once a minute). */
+  if(signedIn()) setTimeout(()=>syncAfterSignIn(true), 1200);
+  let lastPull = Date.now();
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.visibilityState==="visible" && signedIn() && Date.now()-lastPull > 60000){
+      lastPull = Date.now(); syncAfterSignIn(true);
+    }
+  });
 })();
 </script>
 </body>
