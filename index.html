@@ -836,6 +836,11 @@ function persist(){
      (hence the guarded read: it may not exist yet during start-up). */
   const data={ "jtt.settings":S, "jtt.watch":[...watch], "jtt.sent":sent, "jtt.seen":seen };
   try{ if(mm) data["jtt.mm"]=mm; }catch(e){}
+  /* The Tracker belongs here too. Without it a year of training, injury
+     and cost logs lived only in the browser profile, and replacing the exe
+     - which is how this app updates - could take the lot while the ZIP code
+     survived. Guarded like mm because it is declared further down. */
+  try{ if(TK) data["jtt.tracker"]=TK; }catch(e){}
   try{ HOST.postMessage(JSON.stringify({type:"persist", data})); }catch(e){}
 }
 const saveS = () => { LS.set("jtt.settings", S); persist(); syncSoon(); };
@@ -2211,7 +2216,16 @@ function localBundle(){
 }
 function applyBundle(d){
   if(!d || typeof d !== "object") return false;
-  if(d["jtt.settings"]) { S = Object.assign({}, defaults, d["jtt.settings"]); LS.set("jtt.settings", S); }
+  if(d["jtt.settings"]){
+    /* Whichever device signed in last used to win outright, so a brand new
+       phone that had never been set up could push its blanks over a desktop
+       that was fully configured. A field that is empty on the server no
+       longer clears one that is filled in here. */
+    const incoming = Object.assign({}, defaults, d["jtt.settings"]);
+    for(const k of ["zip","lat","lon","place","birthYear","gender"])
+      if((incoming[k]==null || incoming[k]==="") && S[k]) incoming[k] = S[k];
+    S = incoming; LS.set("jtt.settings", S);
+  }
   if(Array.isArray(d["jtt.watch"])) { watch = new Set(d["jtt.watch"]); LS.set("jtt.watch", [...watch]); }
   if(d["jtt.seen"]) { seen = Object.assign({usta:{},utr:{},_new:{usta:{},utr:{}},_keys:{}}, d["jtt.seen"]); LS.set("jtt.seen", seen); }
   /* jtt.tracker is deliberately absent here: it is merged by record id in
@@ -3348,9 +3362,9 @@ const trackerDefaults = () => ({
   deleted:{}
 });
 
-let TK = Object.assign(trackerDefaults(), LS.get("jtt.tracker", {}));
+let TK = Object.assign(trackerDefaults(), loadPart("jtt.tracker", {}));
 
-function saveTK(){ TK.savedAt = Date.now(); LS.set("jtt.tracker", TK); syncSoon(); }
+function saveTK(){ TK.savedAt = Date.now(); LS.set("jtt.tracker", TK); persist(); syncSoon(); }
 const tkId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 function tkPut(key, rec){
   rec.id = rec.id || tkId(); rec.updatedAt = Date.now();
