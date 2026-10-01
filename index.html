@@ -241,6 +241,72 @@ header.nav{
 .viewseg button{padding:7px 22px;font-size:13.5px;border-radius:10px}
 @media (max-width:480px){ .viewseg{width:100%} .viewseg button{flex:1;padding:8px 10px} }
 
+/* ---- Tracker ---- */
+.subseg{display:flex;gap:2px;padding:3px;margin:0 0 18px;background:var(--surface-2);border-radius:12px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.subseg::-webkit-scrollbar{display:none}
+.subseg button{flex:1 0 auto;min-height:38px;padding:8px 15px;font:inherit;font-size:13px;font-weight:500;border:0;background:none;color:var(--ink-2);border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .2s var(--ease-soft),color .2s var(--ease-soft)}
+.subseg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.13)}
+
+.tk-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 0 14px}
+.tk-head h2{font-size:25px;letter-spacing:-.03em;min-width:0}
+.tk-head .btn{flex:none}
+.tk-sec{margin-top:22px}
+.tk-sec h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin-bottom:10px}
+
+.tk-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+.tk-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:14px 15px;min-width:0}
+.tk-card .k{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}
+.tk-card .v{font-size:25px;font-weight:650;letter-spacing:-.03em;margin-top:5px;font-variant-numeric:tabular-nums}
+.tk-card .s{font-size:12px;color:var(--ink-3);margin-top:2px;overflow-wrap:break-word}
+
+.tk-list{background:var(--surface);border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.tk-row{display:flex;gap:12px;align-items:center;padding:12px 15px;border-bottom:1px solid var(--line);min-width:0}
+.tk-row:last-child{border-bottom:0}
+.tk-row .main{flex:1;min-width:0}
+.tk-row .t{font-size:14.5px;font-weight:550;overflow-wrap:break-word}
+.tk-row .d{font-size:12.5px;color:var(--ink-3);margin-top:2px;line-height:1.45;overflow-wrap:break-word}
+.tk-row .amt{flex:none;font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.tk-x{flex:none;border:0;background:none;color:var(--ink-3);font-size:17px;line-height:1;cursor:pointer;padding:9px 6px;border-radius:9px;min-height:38px;min-width:34px}
+.tk-x:hover{color:var(--hot);background:var(--hot-soft)}
+
+.tk-empty{background:var(--surface);border:1px solid var(--line);border-radius:15px;text-align:center;padding:34px 22px}
+.tk-empty h3{font-size:16px;margin-bottom:6px;text-transform:none;letter-spacing:normal;color:var(--ink)}
+.tk-empty p{font-size:13.5px;line-height:1.55;color:var(--ink-3);margin:0 auto 16px;max-width:320px}
+
+.tk-note{display:flex;gap:11px;align-items:flex-start;padding:13px 15px;border-radius:13px;font-size:13px;line-height:1.5;margin-bottom:16px}
+.tk-note .ic{flex:none;font-size:15px;line-height:1.3}
+.tk-note.warn{background:var(--warn-soft);color:var(--ink)}
+.tk-note.care{background:var(--hot-soft);color:var(--ink)}
+.tk-note.info{background:var(--surface-2);color:var(--ink-2)}
+.lnk{border:0;background:none;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+
+.tk-chart{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px 15px 11px}
+.tk-chart h4{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3);margin-bottom:12px}
+.tk-chart svg{display:block;width:100%;height:auto}
+.tk-chart .cap{font-size:11.5px;color:var(--ink-3);margin-top:7px;text-align:center}
+
+.tk-rate{display:grid;grid-template-columns:86px 1fr 30px;gap:11px;align-items:center;padding:7px 0}
+.tk-rate label{font-size:13.5px;color:var(--ink-2)}
+.tk-rate input[type=range]{width:100%;accent-color:var(--accent);min-height:30px}
+.tk-rate .n{font-variant-numeric:tabular-nums;font-weight:600;text-align:right;font-size:14px}
+
+.tk-bar{height:9px;border-radius:5px;background:var(--surface-3);overflow:hidden;margin-top:9px}
+.tk-bar i{display:block;height:100%;border-radius:5px;background:var(--accent);transition:width .4s var(--ease)}
+.tk-bar i.over{background:var(--hot)}
+
+.tk-chips{display:flex;flex-wrap:wrap;gap:7px}
+.tk-chip{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;min-height:36px}
+.tk-chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+
+@media print{
+  body>*:not(#printArea){display:none !important}
+  #printArea{display:block !important;padding:0;color:#000;background:#fff}
+  #printArea h1{font-size:19px;margin-bottom:4px}
+  #printArea table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+  #printArea th,#printArea td{border:1px solid #bbb;padding:6px 8px;text-align:left}
+}
+#printArea{display:none}
+
 /* ---- Matchmaking ---- */
 .mm-panel{margin-top:18px;padding:22px}
 .mm-panel h2{font-size:19px;margin-bottom:4px}
@@ -566,6 +632,7 @@ footer.foot{
     <div class="seg viewseg" role="tablist" aria-label="Section">
       <button role="tab" data-view="tour" aria-pressed="true">Tournaments</button>
       <button role="tab" data-view="mm" aria-pressed="false">Matchmaking</button>
+      <button role="tab" data-view="track" aria-pressed="false">Tracker</button>
     </div>
   </div>
 
@@ -582,6 +649,17 @@ footer.foot{
   </div>
 
   <!-- ======================= Tournaments ======================= -->
+  <div id="viewTrack" hidden>
+    <div class="subseg" id="trackSeg" role="tablist" aria-label="Tracker section">
+      <button role="tab" data-sub="training"    aria-pressed="true">Training</button>
+      <button role="tab" data-sub="academies"   aria-pressed="false">Academies</button>
+      <button role="tab" data-sub="consistency" aria-pressed="false">Consistency</button>
+      <button role="tab" data-sub="injuries"    aria-pressed="false">Injuries</button>
+      <button role="tab" data-sub="expenses"    aria-pressed="false">Expenses</button>
+    </div>
+    <div id="trackBody"></div>
+  </div>
+
   <div id="viewTour">
   <section class="card-surface controls anim-in">
     <div class="ctl-row">
@@ -638,6 +716,7 @@ footer.foot{
 </footer>
 
 <div class="toasts" id="toasts"></div>
+<div id="printArea" aria-hidden="true"></div>
 
 <script>
 "use strict";
@@ -702,7 +781,7 @@ const defaults = {
   zip:"", gender:"", radius:45, months:3,
   ageDiv:"U18", levels:[], onlyOpen:true, singlesOnly:true, sort:"deadline",
   lat:null, lon:null, place:"", notify:false, theme:"auto", gcalClientId:"",
-  source:"usta", utrLevels:[], juniorsOnly:false,
+  source:"usta", utrLevels:[], juniorsOnly:false, tkSub:"training",
   birthYear:new Date().getFullYear()-20,
   view:"tour",
 };
@@ -1911,6 +1990,7 @@ function bind(){
 
   $("#fSource").onchange=e=>switchSource(e.target.value);
   document.querySelectorAll(".viewseg button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+  document.querySelectorAll("#trackSeg button").forEach(b=>b.onclick=()=>{ S.tkSub=b.dataset.sub; saveS(); renderTracker(); });
   $("#mmRefresh").onclick=()=>mmRefresh();
   setInterval(mmTick, MM_POLL);
   $("#chipJunior").onclick=()=>{ S.juniorsOnly=!S.juniorsOnly; saveS(); syncControls(); render(); };
@@ -2112,17 +2192,19 @@ async function resetPassword(email){
 /* Only the things that are yours wherever you are: settings, saved tournaments,
    and which deadlines you've already been told about. Matchmaking identity stays
    per-device on purpose, so two devices don't fight over one post. */
-const SYNC_KEYS = ["jtt.settings", "jtt.watch", "jtt.seen"];
+const SYNC_KEYS = ["jtt.settings", "jtt.watch", "jtt.seen", "jtt.tracker"];
 let syncTimer = null, syncing = false;
 
 function localBundle(){
-  return { at: Date.now(), "jtt.settings":S, "jtt.watch":[...watch], "jtt.seen":seen };
+  return { at: Date.now(), "jtt.settings":S, "jtt.watch":[...watch], "jtt.seen":seen, "jtt.tracker":TK };
 }
 function applyBundle(d){
   if(!d || typeof d !== "object") return false;
   if(d["jtt.settings"]) { S = Object.assign({}, defaults, d["jtt.settings"]); LS.set("jtt.settings", S); }
   if(Array.isArray(d["jtt.watch"])) { watch = new Set(d["jtt.watch"]); LS.set("jtt.watch", [...watch]); }
   if(d["jtt.seen"]) { seen = Object.assign({usta:{},utr:{},_new:{usta:{},utr:{}},_keys:{}}, d["jtt.seen"]); LS.set("jtt.seen", seen); }
+  /* jtt.tracker is deliberately absent here: it is merged by record id in
+     syncAfterSignIn, never replaced wholesale. */
   return true;
 }
 
@@ -2147,6 +2229,9 @@ async function syncAfterSignIn(){
   try{ rows = await sbAuthed(`/rest/v1/user_data?user_id=eq.${session.user_id}&select=data`); }
   catch(e){ return; }
   const remote = rows && rows[0] && rows[0].data;
+  /* Merged in both directions every time and pushed back below, so a session
+     logged on the phone and one logged on the laptop both survive. */
+  mergeTracker(remote && remote["jtt.tracker"]);
   const localAt = LS.get("jtt.syncAt", 0);
   if(remote && typeof remote.at === "number" && remote.at > localAt){
     applyBundle(remote);
@@ -2154,9 +2239,9 @@ async function syncAfterSignIn(){
     syncControls(); render();
     toast("Your setup was restored from your account","☁️",4200);
     if(S.lat != null) search();
-  } else {
-    await syncPush();
   }
+  await syncPush();                  /* the merged tracker goes back up either way */
+  if(S.view==="track") renderTracker();
 }
 
 /* ---------------- the Account panel in Settings ---------------- */
@@ -3218,22 +3303,937 @@ async function openCourtPicker(){
   loadDots();
 }
 
+/* ============================================================
+   Tracker
+   ============================================================
+   Five logs that belong to one player: what they trained, where and with
+   whom, how they are striking the ball, what hurts, and what it all costs.
+
+   Nothing here ships with contents. Academies, coaches, lesson rates and
+   body parts are all defined by whoever is using it - presetting one
+   person's academy or one person's injury would be wrong for everyone else.
+
+   It works signed out, storing locally, and says plainly that local means
+   losable. With an account it merges by record id rather than replacing the
+   blob, because logs are written on whichever device is to hand and a
+   straight overwrite would throw away the other one's entries.
+   ============================================================ */
+
+const TK_SUBS  = [["training","Training"],["academies","Academies"],
+                  ["consistency","Consistency"],["injuries","Injuries"],["expenses","Expenses"]];
+const TK_LISTS = ["sessions","academies","ratings","focus","stats","matches","checkins","expenses","presets"];
+const TK_SKILLS = [["forehand","Forehand"],["backhand","Backhand"],["serve","Serve"],
+                   ["ret","Return"],["volleys","Volleys"],["movement","Movement"],["mental","Mental game"]];
+const TK_CATS = ["Private lesson","Group lesson","Restringing","Balls & gear","Tournament entry","Travel","Other"];
+const TK_SURFACES = ["","Hard","Clay","Grass","Carpet","Indoor"];
+const TK_TYPES = ["","Private","Group","Drill","Match play","Fitness"];
+
+const trackerDefaults = () => ({
+  v:1, savedAt:0,
+  profile:{ heightIn:null, hand:"" },
+  budget:{ monthlyCap:null },
+  sessions:[], academies:[], ratings:[], focus:[], stats:[],
+  matches:[], checkins:[], expenses:[], presets:[],
+  deleted:{}
+});
+
+let TK = Object.assign(trackerDefaults(), LS.get("jtt.tracker", {}));
+
+function saveTK(){ TK.savedAt = Date.now(); LS.set("jtt.tracker", TK); syncSoon(); }
+const tkId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+function tkPut(key, rec){
+  rec.id = rec.id || tkId(); rec.updatedAt = Date.now();
+  const list = TK[key] || (TK[key] = []);
+  const i = list.findIndex(r => r.id === rec.id);
+  if(i >= 0) list[i] = rec; else list.push(rec);
+  saveTK(); return rec;
+}
+function tkDrop(key, id){
+  TK[key] = (TK[key]||[]).filter(r => r.id !== id);
+  TK.deleted[id] = Date.now();
+  saveTK();
+}
+
+/* Logs are appended wherever the player happens to be, so the stored blob
+   cannot simply be replaced by whichever device wrote last - the phone's
+   sessions would wipe the laptop's. Both sides are unioned by record id,
+   the newer copy of any shared id wins, and deletes leave a tombstone so
+   they are not resurrected by the device that had not heard about them. */
+function mergeTracker(remote){
+  if(!remote || typeof remote !== "object") return false;
+  const out = trackerDefaults();
+  out.deleted = Object.assign({}, TK.deleted||{}, remote.deleted||{});
+  for(const key of TK_LISTS){
+    const byId = new Map();
+    for(const r of (remote[key]||[])) if(r && r.id) byId.set(r.id, r);
+    for(const r of (TK[key]||[])){
+      if(!r || !r.id) continue;
+      const other = byId.get(r.id);
+      if(!other || (r.updatedAt||0) >= (other.updatedAt||0)) byId.set(r.id, r);
+    }
+    out[key] = [...byId.values()].filter(r => !out.deleted[r.id]);
+  }
+  /* Single values, not lists: there is nothing to union, so newest wins. */
+  const remoteNewer = (remote.savedAt||0) > (TK.savedAt||0);
+  out.profile = remoteNewer ? Object.assign({}, TK.profile, remote.profile)
+                            : Object.assign({}, remote.profile, TK.profile);
+  out.budget  = remoteNewer ? Object.assign({}, TK.budget,  remote.budget)
+                            : Object.assign({}, remote.budget,  TK.budget);
+  out.savedAt = Math.max(TK.savedAt||0, remote.savedAt||0);
+  TK = out; LS.set("jtt.tracker", TK);
+  return true;
+}
+
+/* ---------------- small helpers ---------------- */
+
+/* The print summary builds a table with innerHTML, and the notes in it are
+   free text. Nothing here is hostile, but a note containing a "<" would
+   quietly eat the rest of the row. */
+const tkEsc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+const tkToday  = () => new Date().toLocaleDateString("en-CA");          /* YYYY-MM-DD, local */
+const tkDay    = d => new Date(d + "T00:00:00").getTime();              /* local midnight, never UTC */
+const tkMonth  = d => (d||"").slice(0,7);
+const tkMoney  = n => "$" + (Math.round((n||0)*100)/100).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+const tkNice   = d => { try{ return new Date(d+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ return d; } };
+const tkSorted = list => [...(list||[])].sort((a,b)=> (b.date||"").localeCompare(a.date||""));
+
+function tkWeekKey(d){
+  const t = new Date(d + "T00:00:00");
+  const day = (t.getDay() + 6) % 7;              /* Monday-first */
+  t.setDate(t.getDate() - day);
+  return t.toLocaleDateString("en-CA");
+}
+function tkStreak(){
+  const days = new Set((TK.sessions||[]).map(s => s.date));
+  if(!days.size) return 0;
+  let n = 0;
+  const cur = new Date();
+  /* Today not being logged yet should not read as a broken streak. */
+  if(!days.has(cur.toLocaleDateString("en-CA"))) cur.setDate(cur.getDate() - 1);
+  for(;;){
+    if(!days.has(cur.toLocaleDateString("en-CA"))) break;
+    n++; cur.setDate(cur.getDate() - 1);
+  }
+  return n;
+}
+function tkSince(days){ return Date.now() - days*DAY; }
+
+function tkEl(tag, cls, text){ return el(tag, cls, text); }
+function tkField(parent, label, node, hint){
+  const w = el("div","field");
+  w.appendChild(el("label",null,label));
+  w.appendChild(node);
+  if(hint) w.appendChild(el("div","hint",hint));
+  parent.appendChild(w); return node;
+}
+function tkNum(val, ph, step){
+  const i = el("input"); i.type="number"; i.inputMode="decimal";
+  if(step) i.step = step; i.placeholder = ph||"";
+  i.value = (val==null||val==="") ? "" : String(val);
+  return i;
+}
+function tkDateInput(val){ const i=el("input"); i.type="date"; i.value = val || tkToday(); return i; }
+function tkText(val, ph, max){ return inp(val||"", ph||"", max||80); }
+function tkSelect(opts, val){ return sel(opts.map(o => Array.isArray(o) ? o : [o,o||"—"]), val||""); }
+
+/* ---------------- charts ---------------- */
+
+/* Deliberately hand-rolled. The app has no build step and pulls in nothing
+   it does not need; a charting library would be larger than this whole file. */
+function tkLine(series, o){
+  o = Object.assign({w:340,h:110,pad:10,min:null,max:null,fill:true}, o||{});
+  if(!series || series.length < 2) return "";
+  const xs = series.map(p=>p.x), ys = series.map(p=>p.y);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  let y0 = o.min!=null?o.min:Math.min(...ys), y1 = o.max!=null?o.max:Math.max(...ys);
+  if(y1===y0){ y0-=1; y1+=1; }
+  const sx = v => o.pad + (x1===x0?0.5:(v-x0)/(x1-x0))*(o.w-2*o.pad);
+  const sy = v => o.h-o.pad - (v-y0)/(y1-y0)*(o.h-2*o.pad);
+  const pts = series.map(p=>[sx(p.x), sy(p.y)]);
+  let d = "M" + pts[0][0].toFixed(1) + " " + pts[0][1].toFixed(1);
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1], b=pts[i], mx=((a[0]+b[0])/2).toFixed(1);
+    d += " C" + mx + " " + a[1].toFixed(1) + "," + mx + " " + b[1].toFixed(1)
+       + "," + b[0].toFixed(1) + " " + b[1].toFixed(1);
+  }
+  const area = o.fill
+    ? '<path d="'+d+' L'+pts[pts.length-1][0].toFixed(1)+' '+(o.h-o.pad)+' L'+pts[0][0].toFixed(1)+' '+(o.h-o.pad)+' Z" fill="var(--accent-soft)" stroke="none"/>'
+    : "";
+  const dots = pts.length <= 14
+    ? pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="var(--accent)"/>').join("")
+    : "";
+  return '<svg viewBox="0 0 '+o.w+' '+o.h+'" preserveAspectRatio="none" role="img">'
+       + area
+       + '<path d="'+d+'" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+       + dots + '</svg>';
+}
+function tkChartCard(title, svg, caption){
+  const c = el("div","tk-chart");
+  c.appendChild(el("h4",null,title));
+  const holder = el("div"); holder.innerHTML = svg; c.appendChild(holder);
+  if(caption) c.appendChild(el("div","cap",caption));
+  return c;
+}
+
+/* ---------------- generic list bits ---------------- */
+
+function tkEmpty(host, title, body, btnLabel, onClick){
+  const e = el("div","tk-empty");
+  e.appendChild(el("h3",null,title));
+  e.appendChild(el("p",null,body));
+  if(btnLabel){ const b=el("button","btn",btnLabel); b.onclick=onClick; e.appendChild(b); }
+  host.appendChild(e);
+}
+function tkRow(list, title, detail, right, onDelete){
+  const r = el("div","tk-row");
+  const m = el("div","main");
+  m.appendChild(el("div","t",title));
+  if(detail) m.appendChild(el("div","d",detail));
+  r.appendChild(m);
+  if(right != null) r.appendChild(el("div","amt",right));
+  if(onDelete){
+    const x = el("button","tk-x","×");
+    x.title = "Delete"; x.setAttribute("aria-label","Delete entry");
+    x.onclick = onDelete;
+    r.appendChild(x);
+  }
+  list.appendChild(r); return r;
+}
+function tkCard(host, k, v, s){
+  const c = el("div","tk-card");
+  c.appendChild(el("div","k",k));
+  c.appendChild(el("div","v",v));
+  if(s) c.appendChild(el("div","s",s));
+  host.appendChild(c); return c;
+}
+function tkSection(host, title){
+  const s = el("div","tk-sec");
+  if(title) s.appendChild(el("h3",null,title));
+  host.appendChild(s); return s;
+}
+
+/* A bottom sheet, matching the ones the rest of the app already uses. */
+function tkSheet(title, build, onSave){
+  const scrim = el("div","scrim"), m = el("div","sheet");
+  m.appendChild(el("h2",null,title));
+  const form = el("div"); m.appendChild(form);
+  const note = el("div","hint"); m.appendChild(note);
+  const foot = el("div","sheet-foot");
+  const cancel = el("button","act","Cancel"), save = el("button","btn","Save");
+  foot.appendChild(cancel); foot.appendChild(save); m.appendChild(foot);
+  scrim.appendChild(m); document.body.appendChild(scrim);
+
+  const close = () => { scrim.style.animation="fadeIn .25s var(--ease-soft) reverse both"; setTimeout(()=>scrim.remove(),230); };
+  cancel.onclick = close;
+  scrim.onclick = e => { if(e.target===scrim) close(); };
+  document.addEventListener("keydown", function esc(ev){
+    if(ev.key==="Escape"){ close(); document.removeEventListener("keydown", esc); }
+  });
+  build(form);
+  const first = form.querySelector("input,select,textarea"); if(first) first.focus();
+  save.onclick = () => {
+    try{ if(onSave() !== false){ close(); renderTracker(); } }
+    catch(e){ note.textContent = e.message || "That did not save"; note.classList.add("bad"); }
+  };
+  return { close, note };
+}
+
+/* ---------------- the tab ---------------- */
+
+function renderTracker(){
+  const host = $("#trackBody"); if(!host) return;
+  document.querySelectorAll("#trackSeg button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.sub === S.tkSub)));
+  host.innerHTML = "";
+  if(!signedIn()) host.appendChild(tkLocalOnlyNote());
+  const views = { training:tkTraining, academies:tkAcademies, consistency:tkConsistency,
+                  injuries:tkInjuries, expenses:tkExpenses };
+  (views[S.tkSub] || tkTraining)(host);
+
+  const bs = tkSection(host, "Backup");
+  bs.appendChild(el("p","fine","A JSON file of everything in the Tracker. Importing merges rather than replaces, so an old backup can never delete something logged after it was taken."));
+  const brow = el("div","mm-actions");
+  const ex = el("button","act","Export"); ex.onclick = tkExport;
+  const im = el("button","act","Import"); im.onclick = tkImport;
+  brow.appendChild(ex); brow.appendChild(im);
+  bs.appendChild(brow);
+}
+
+function tkLocalOnlyNote(){
+  const n = el("div","tk-note warn");
+  n.appendChild(el("span","ic","⚠️"));
+  const d = el("div");
+  d.innerHTML = "<strong>This device only.</strong> Without an account your log lives in this browser alone "
+              + "&mdash; clearing your history, losing the phone or opening the app anywhere else and it is gone. ";
+  const b = el("button","lnk","Create a free account");
+  b.onclick = () => { openSettings(false); setTimeout(()=>accountForm("signup"), 260); };
+  d.appendChild(b);
+  d.appendChild(document.createTextNode(" and it follows you everywhere. Everything works without one."));
+  n.appendChild(d);
+  return n;
+}
+
+function tkHead(host, title, addLabel, onAdd){
+  const h = el("div","tk-head");
+  h.appendChild(el("h2",null,title));
+  if(addLabel){ const b=el("button","btn",addLabel); b.onclick=onAdd; h.appendChild(b); }
+  host.appendChild(h);
+}
+
+/* ---------------- 1. Training ---------------- */
+
+function tkAcademyName(id){
+  const a = (TK.academies||[]).find(x => x.id === id);
+  return a ? a.name : "";
+}
+function tkSessionSheet(rec){
+  rec = rec || { date: tkToday() };
+  let dateI, acadI, coachI, surfI, typeI, minsI, noteI;
+  tkSheet(rec.id ? "Edit session" : "Log a session", form => {
+    dateI = tkField(form, "Date", tkDateInput(rec.date));
+    const acadOpts = [["","— none —"]].concat((TK.academies||[]).map(a => [a.id, a.name]));
+    acadI = tkField(form, "Academy", tkSelect(acadOpts, rec.academyId||""),
+      (TK.academies||[]).length ? "" : "Add academies in the Academies tab and they will appear here.");
+    coachI = tkField(form, "Coach", tkText(rec.coach, "who you worked with", 60));
+    acadI.onchange = () => {
+      const a = (TK.academies||[]).find(x => x.id === acadI.value);
+      if(a && !coachI.value) coachI.value = a.coach || "";
+      if(a && a.surface && !surfI.value) surfI.value = a.surface;
+    };
+    const r2 = el("div","row2"); form.appendChild(r2);
+    surfI = tkField(r2, "Surface", tkSelect(TK_SURFACES, rec.surface));
+    typeI = tkField(r2, "Type", tkSelect(TK_TYPES, rec.type));
+    minsI = tkField(form, "Minutes", tkNum(rec.mins, "60", "5"));
+    noteI = tkField(form, "Notes", tkText(rec.note, "what you worked on", 200));
+  }, () => {
+    if(!dateI.value) throw new Error("Pick a date");
+    tkPut("sessions", Object.assign({}, rec, {
+      date: dateI.value, academyId: acadI.value, coach: clean(coachI.value,60),
+      surface: surfI.value, type: typeI.value,
+      mins: minsI.value ? Math.max(0, +minsI.value) : null, note: clean(noteI.value,200)
+    }));
+    toast("Session logged","✅");
+  });
+}
+function tkRatingSheet(){
+  const week = tkWeekKey(tkToday());
+  const existing = (TK.ratings||[]).find(r => r.week === week) || { week };
+  const inputs = {};
+  tkSheet("This week's ratings", form => {
+    form.appendChild(el("p","lede","Rate each one out of 10. One set per week &mdash; saving again updates this week."));
+    for(const [key,label] of TK_SKILLS){
+      const row = el("div","tk-rate");
+      row.appendChild(el("label",null,label));
+      const r = el("input"); r.type="range"; r.min="1"; r.max="10"; r.step="1";
+      r.value = String(existing[key] || 5);
+      const n = el("div","n", r.value);
+      r.oninput = () => { n.textContent = r.value; };
+      row.appendChild(r); row.appendChild(n);
+      form.appendChild(row);
+      inputs[key] = r;
+    }
+  }, () => {
+    const rec = Object.assign({}, existing);
+    for(const [key] of TK_SKILLS) rec[key] = +inputs[key].value;
+    tkPut("ratings", rec);
+    toast("Ratings saved","✅");
+  });
+}
+function tkFocusSheet(){
+  const month = tkMonth(tkToday());
+  const existing = (TK.focus||[]).find(f => f.month === month) || { month };
+  let skillsI, goalI;
+  tkSheet("This month's focus", form => {
+    form.appendChild(el("p","lede","One or two things to work on. Keep it small enough to actually finish."));
+    skillsI = tkField(form, "Focus", tkText(existing.skills, "e.g. second serve, split step", 80));
+    goalI   = tkField(form, "Goal",  tkText(existing.goal, "what done looks like", 140));
+  }, () => {
+    if(!skillsI.value.trim()) throw new Error("Name at least one thing to focus on");
+    tkPut("focus", Object.assign({}, existing, {
+      skills: clean(skillsI.value,80), goal: clean(goalI.value,140), done: existing.done||false
+    }));
+  });
+}
+
+function tkTraining(host){
+  tkHead(host, "Training", "Log session", () => tkSessionSheet());
+
+  const sessions = TK.sessions||[];
+  const wk = sessions.filter(s => tkDay(s.date) >= tkSince(7)).length;
+  const mins = sessions.filter(s => tkDay(s.date) >= tkSince(30)).reduce((a,s)=>a+(s.mins||0),0);
+  const cards = el("div","tk-cards");
+  tkCard(cards, "This week", String(wk), wk===1?"session":"sessions");
+  tkCard(cards, "Last 30 days", (mins/60).toFixed(1).replace(/\.0$/,""), "hours on court");
+  tkCard(cards, "Streak", String(tkStreak()), "days in a row");
+  host.appendChild(cards);
+
+  /* Monthly focus */
+  const month = tkMonth(tkToday());
+  const focus = (TK.focus||[]).find(f => f.month === month);
+  const fs = tkSection(host, "This month's focus");
+  if(!focus){
+    const e = el("div","tk-empty");
+    e.appendChild(el("p",null,"Pick one or two things to work on this month."));
+    const b = el("button","btn","Set a focus"); b.onclick = tkFocusSheet;
+    e.appendChild(b); fs.appendChild(e);
+  } else {
+    const list = el("div","tk-list");
+    const r = tkRow(list, focus.skills, focus.goal || "", focus.done ? "Done" : null,
+      () => { tkDrop("focus", focus.id); renderTracker(); });
+    r.style.cursor = "pointer";
+    r.onclick = e => { if(!e.target.closest(".tk-x")) tkFocusSheet(); };
+    fs.appendChild(list);
+    const done = el("button","act", focus.done ? "Mark not done" : "Mark done");
+    done.style.marginTop = "10px";
+    done.onclick = () => { tkPut("focus", Object.assign({}, focus, {done:!focus.done})); renderTracker(); };
+    fs.appendChild(done);
+  }
+
+  /* Skill ratings */
+  const rs = tkSection(host, "Weekly ratings");
+  const rateBtn = el("button","btn","Rate this week");
+  rateBtn.onclick = tkRatingSheet;
+  const ratings = [...(TK.ratings||[])].sort((a,b)=>(a.week||"").localeCompare(b.week||""));
+  if(ratings.length < 2){
+    const e = el("div","tk-empty");
+    e.appendChild(el("h3",null, ratings.length ? "One week in" : "No ratings yet"));
+    e.appendChild(el("p",null, ratings.length
+      ? "Rate another week and the trend lines appear."
+      : "Score your strokes out of 10 each week and watch the lines move."));
+    e.appendChild(rateBtn); rs.appendChild(e);
+  } else {
+    rs.appendChild(rateBtn);
+    const grid = el("div"); grid.style.display="grid"; grid.style.gap="10px"; grid.style.marginTop="12px";
+    for(const [key,label] of TK_SKILLS){
+      const pts = ratings.filter(r => r[key]!=null).map(r => ({x: tkDay(r.week), y: r[key]}));
+      if(pts.length < 2) continue;
+      const last = pts[pts.length-1].y, first = pts[0].y;
+      const delta = last - first;
+      grid.appendChild(tkChartCard(label, tkLine(pts,{min:1,max:10}),
+        "now " + last + " / 10" + (delta ? "  ·  " + (delta>0?"+":"") + delta + " since you started" : "")));
+    }
+    rs.appendChild(grid);
+  }
+
+  /* Session log */
+  const ls = tkSection(host, "Sessions");
+  if(!sessions.length){
+    tkEmpty(ls, "Nothing logged yet", "Every session you record makes the charts above more useful.",
+      "Log your first session", () => tkSessionSheet());
+  } else {
+    const list = el("div","tk-list");
+    for(const s of tkSorted(sessions).slice(0,40)){
+      const where = [tkAcademyName(s.academyId), s.coach].filter(Boolean).join(" · ");
+      const what  = [s.type, s.surface, s.mins ? s.mins+" min" : ""].filter(Boolean).join(" · ");
+      const row = tkRow(list, tkNice(s.date) + (where ? " — " + where : ""),
+        [what, s.note].filter(Boolean).join(" · "), null,
+        () => { tkDrop("sessions", s.id); renderTracker(); });
+      row.style.cursor="pointer";
+      row.onclick = e => { if(!e.target.closest(".tk-x")) tkSessionSheet(s); };
+    }
+    ls.appendChild(list);
+  }
+}
+
+/* ---------------- 2. Academies ---------------- */
+
+function tkAcademySheet(rec){
+  rec = rec || {};
+  let nameI, coachI, surfI, noteI;
+  tkSheet(rec.id ? "Edit academy" : "Add an academy", form => {
+    nameI  = tkField(form, "Academy or club", tkText(rec.name, "where you train", 60));
+    coachI = tkField(form, "Coach", tkText(rec.coach, "main coach there", 60),
+      "Shows up as the default when you log a session here.");
+    surfI  = tkField(form, "Usual surface", tkSelect(TK_SURFACES, rec.surface));
+    noteI  = tkField(form, "Notes", tkText(rec.note, "anything worth remembering", 160));
+  }, () => {
+    if(!nameI.value.trim()) throw new Error("Give the academy a name");
+    tkPut("academies", Object.assign({}, rec, {
+      name: clean(nameI.value,60), coach: clean(coachI.value,60),
+      surface: surfI.value, note: clean(noteI.value,160)
+    }));
+  });
+}
+
+function tkAcademies(host){
+  tkHead(host, "Academies", "Add academy", () => tkAcademySheet());
+  const academies = TK.academies||[];
+  if(!academies.length){
+    tkEmpty(host, "No academies yet",
+      "Add the places you train and who you train with. They then become one-tap options when you log a session.",
+      "Add your first academy", () => tkAcademySheet());
+    return;
+  }
+  const sessions = TK.sessions||[];
+  const list = el("div","tk-list");
+  for(const a of academies){
+    const mine = sessions.filter(s => s.academyId === a.id);
+    const hrs  = mine.reduce((t,s)=>t+(s.mins||0),0)/60;
+    const last = mine.map(s=>s.date).sort().pop();
+    const coaches = [...new Set(mine.map(s=>s.coach).filter(Boolean))];
+    const detail = [
+      mine.length ? mine.length + (mine.length===1?" session":" sessions") : "no sessions yet",
+      hrs ? hrs.toFixed(1).replace(/\.0$/,"") + " hrs" : "",
+      a.surface, last ? "last " + tkNice(last) : "",
+      coaches.length > 1 ? "coaches: " + coaches.join(", ") : (a.coach || "")
+    ].filter(Boolean).join(" · ");
+    const row = tkRow(list, a.name, detail, null, () => {
+      if(mine.length && !confirm("Delete " + a.name + "? Its " + mine.length + " logged sessions stay, but lose the link.")) return;
+      tkDrop("academies", a.id); renderTracker();
+    });
+    row.style.cursor="pointer";
+    row.onclick = e => { if(!e.target.closest(".tk-x")) tkAcademySheet(a); };
+  }
+  host.appendChild(list);
+
+  const s = tkSection(host, "Log a session here");
+  const b = el("button","act","Log a session");
+  b.onclick = () => tkSessionSheet();
+  s.appendChild(b);
+}
+
+/* ---------------- 3. Consistency ---------------- */
+
+function tkStatSheet(rec){
+  rec = rec || { date: tkToday() };
+  let dateI, fsI, dfI, rallyI;
+  tkSheet(rec.id ? "Edit stats" : "Log session stats", form => {
+    dateI = tkField(form, "Date", tkDateInput(rec.date));
+    fsI   = tkField(form, "First serve %", tkNum(rec.firstServePct, "55", "1"));
+    dfI   = tkField(form, "Double faults", tkNum(rec.doubleFaults, "4", "1"));
+    rallyI= tkField(form, "Longest rally without an error", tkNum(rec.longestRally, "12", "1"));
+  }, () => {
+    const fs = fsI.value === "" ? null : +fsI.value;
+    if(fs != null && (fs < 0 || fs > 100)) throw new Error("First serve % is between 0 and 100");
+    tkPut("stats", Object.assign({}, rec, {
+      date: dateI.value, firstServePct: fs,
+      doubleFaults: dfI.value === "" ? null : Math.max(0,+dfI.value),
+      longestRally: rallyI.value === "" ? null : Math.max(0,+rallyI.value)
+    }));
+  });
+}
+function tkMatchSheet(rec){
+  rec = rec || { date: tkToday() };
+  let dateI, oppI, lvlI, scoreI, surfI, wI, dI, tourI;
+  tkSheet(rec.id ? "Edit match" : "Log a match", form => {
+    dateI = tkField(form, "Date", tkDateInput(rec.date));
+    const r2 = el("div","row2"); form.appendChild(r2);
+    oppI = tkField(r2, "Opponent", tkText(rec.opponent, "name or level", 60));
+    lvlI = tkField(r2, "Their level", tkText(rec.level, "UTR, rating, age", 30));
+    scoreI = tkField(form, "Score", tkText(rec.score, "6-4 3-6 10-7", 40));
+    surfI  = tkField(form, "Surface", tkSelect(TK_SURFACES, rec.surface));
+    const saved = tkSavedTours();
+    if(saved.length) tourI = tkField(form, "Tournament",
+      tkSelect([["","— none —"]].concat(saved.map(t=>[t.name,t.name])), rec.tournament));
+    wI = tkField(form, "What worked", tkText(rec.worked, "", 200));
+    dI = tkField(form, "What did not", tkText(rec.didnt, "", 200));
+  }, () => {
+    tkPut("matches", Object.assign({}, rec, {
+      date: dateI.value, opponent: clean(oppI.value,60), level: clean(lvlI.value,30),
+      score: clean(scoreI.value,40), surface: surfI.value,
+      tournament: tourI ? tourI.value : (rec.tournament||""),
+      worked: clean(wI.value,200), didnt: clean(dI.value,200)
+    }));
+  });
+}
+function tkSavedTours(){
+  try{ return (ALL||[]).filter(t => watch.has(t.id)).map(t => ({id:t.id, name:t.name})); }
+  catch(e){ return []; }
+}
+
+function tkConsistency(host){
+  tkHead(host, "Consistency", "Log stats", () => tkStatSheet());
+
+  const stats = TK.stats||[], sessions = TK.sessions||[];
+  const recent = stats.filter(s => tkDay(s.date) >= tkSince(30) && s.firstServePct != null);
+  const avgFs = recent.length ? Math.round(recent.reduce((a,s)=>a+s.firstServePct,0)/recent.length) : null;
+  const best  = stats.reduce((m,s)=> Math.max(m, s.longestRally||0), 0);
+  const perWk = sessions.filter(s => tkDay(s.date) >= tkSince(28)).length / 4;
+
+  const cards = el("div","tk-cards");
+  tkCard(cards, "First serve", avgFs==null ? "—" : avgFs + "%", "30-day average");
+  tkCard(cards, "Longest rally", best ? String(best) : "—", "balls without an error");
+  tkCard(cards, "Volume", perWk ? perWk.toFixed(1).replace(/\.0$/,"") : "0", "sessions a week");
+  host.appendChild(cards);
+
+  const sorted = [...stats].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const fsPts = sorted.filter(s=>s.firstServePct!=null).map(s=>({x:tkDay(s.date), y:s.firstServePct}));
+  const rlPts = sorted.filter(s=>s.longestRally!=null).map(s=>({x:tkDay(s.date), y:s.longestRally}));
+  if(fsPts.length >= 2 || rlPts.length >= 2){
+    const g = tkSection(host, "Trends");
+    const grid = el("div"); grid.style.display="grid"; grid.style.gap="10px"; grid.appendChild(el("div"));
+    grid.innerHTML = "";
+    if(fsPts.length>=2) grid.appendChild(tkChartCard("First serve %", tkLine(fsPts,{min:0,max:100}),
+      "latest " + fsPts[fsPts.length-1].y + "%"));
+    if(rlPts.length>=2) grid.appendChild(tkChartCard("Longest rally", tkLine(rlPts,{min:0}),
+      "best " + best));
+    g.appendChild(grid);
+  }
+
+  const ss = tkSection(host, "Session stats");
+  if(!stats.length){
+    tkEmpty(ss, "No stats yet", "After a session, jot down your first serve percentage, double faults and longest rally.",
+      "Log your first stats", () => tkStatSheet());
+  } else {
+    const list = el("div","tk-list");
+    for(const s of tkSorted(stats).slice(0,30)){
+      const bits = [
+        s.firstServePct!=null ? s.firstServePct+"% first serves" : "",
+        s.doubleFaults!=null ? s.doubleFaults+" double faults" : "",
+        s.longestRally!=null ? "rally of "+s.longestRally : ""
+      ].filter(Boolean).join(" · ");
+      const row = tkRow(list, tkNice(s.date), bits, null, () => { tkDrop("stats", s.id); renderTracker(); });
+      row.style.cursor="pointer";
+      row.onclick = e => { if(!e.target.closest(".tk-x")) tkStatSheet(s); };
+    }
+    ss.appendChild(list);
+  }
+
+  const ms = tkSection(host, "Matches");
+  const addM = el("button","act","Log a match"); addM.onclick = () => tkMatchSheet();
+  const matches = TK.matches||[];
+  if(!matches.length){
+    const e = el("div","tk-empty");
+    e.appendChild(el("h3",null,"No matches yet"));
+    e.appendChild(el("p",null,"Record who you played, the score, and the two things worth remembering."));
+    e.appendChild(addM); ms.appendChild(e);
+  } else {
+    ms.appendChild(addM);
+    const list = el("div","tk-list"); list.style.marginTop="12px";
+    for(const mm of tkSorted(matches).slice(0,30)){
+      const head = [tkNice(mm.date), mm.opponent || "Match", mm.score].filter(Boolean).join(" · ");
+      const det  = [mm.level && "vs "+mm.level, mm.surface, mm.tournament,
+                    mm.worked && "worked: "+mm.worked, mm.didnt && "didn't: "+mm.didnt].filter(Boolean).join(" · ");
+      const row = tkRow(list, head, det, null, () => { tkDrop("matches", mm.id); renderTracker(); });
+      row.style.cursor="pointer";
+      row.onclick = e => { if(!e.target.closest(".tk-x")) tkMatchSheet(mm); };
+    }
+    ms.appendChild(list);
+  }
+}
+
+/* ---------------- 4. Injuries ---------------- */
+
+const TK_PART_SUGGESTIONS = ["Knee","Wrist","Shoulder","Elbow","Ankle","Lower back","Hip","Foot","Neck"];
+
+function tkCheckinSheet(rec){
+  rec = rec || { date: tkToday() };
+  let dateI, partI, lvlI, restI, loadI, noteI;
+  tkSheet(rec.id ? "Edit check-in" : "How did that feel?", form => {
+    dateI = tkField(form, "Date", tkDateInput(rec.date));
+
+    const wrap = el("div");
+    const list = el("datalist"); list.id = "tkParts";
+    /* Suggestions only. Nothing is filled in - the body part is whoever's
+       using it, not a guess on our part. */
+    for(const p of TK_PART_SUGGESTIONS){ const o=el("option"); o.value=p; list.appendChild(o); }
+    const t = tkText(rec.part, "where it hurts", 40);
+    t.setAttribute("list","tkParts");
+    wrap.appendChild(t); wrap.appendChild(list);
+    partI = tkField(form, "Body part", wrap).querySelector("input");
+
+    const row = el("div","tk-rate");
+    row.appendChild(el("label",null,"Pain 0-10"));
+    const r = el("input"); r.type="range"; r.min="0"; r.max="10"; r.step="1"; r.value=String(rec.level||0);
+    const n = el("div","n", r.value);
+    r.oninput = () => { n.textContent = r.value; };
+    row.appendChild(r); row.appendChild(n); form.appendChild(row);
+    lvlI = r;
+
+    const rl = el("label"); rl.style.display="flex"; rl.style.gap="9px"; rl.style.alignItems="center";
+    rl.style.margin="10px 0"; rl.style.fontSize="14px";
+    restI = el("input"); restI.type="checkbox"; restI.checked = !!rec.atRest;
+    rl.appendChild(restI); rl.appendChild(document.createTextNode("It hurts at rest too, not just when playing"));
+    form.appendChild(rl);
+
+    loadI = tkField(form, "Other sport this week", tkText(rec.otherLoad, "e.g. 3 soccer practices", 60));
+    noteI = tkField(form, "Notes", tkText(rec.note, "", 200));
+  }, () => {
+    if(!partI.value.trim()) throw new Error("Say which part of you it is");
+    tkPut("checkins", Object.assign({}, rec, {
+      date: dateI.value, part: clean(partI.value,40), level: +lvlI.value,
+      atRest: restI.checked, otherLoad: clean(loadI.value,60), note: clean(noteI.value,200)
+    }));
+  });
+}
+
+/* A nudge, never a diagnosis. It says who to tell, not what is wrong. */
+function tkCareFlag(){
+  const recent = (TK.checkins||[]).filter(c => tkDay(c.date) >= tkSince(60));
+  const high = recent.filter(c => (c.level||0) >= 6).length;
+  const rest = recent.filter(c => c.atRest).length;
+  if(high >= 2) return "You have logged pain at 6 or higher more than once lately. That is worth telling a parent or coach, and worth having someone qualified take a look. The summary below is designed to be shown to them.";
+  if(rest >= 3) return "You have noted pain at rest several times, not just while playing. Worth mentioning to a parent or coach and getting it checked. The summary below is designed to be shown to them.";
+  return null;
+}
+
+function tkInjuries(host){
+  tkHead(host, "Injuries", "Check in", () => tkCheckinSheet());
+  const checkins = TK.checkins||[];
+
+  const flag = tkCareFlag();
+  if(flag){
+    const n = el("div","tk-note care");
+    n.appendChild(el("span","ic","❤️"));
+    n.appendChild(el("div",null,flag));
+    host.appendChild(n);
+  }
+
+  if(!checkins.length){
+    tkEmpty(host, "Nothing logged",
+      "After a session, note anything that hurt and how much. Over weeks this becomes the thing a doctor actually wants to see.",
+      "First check-in", () => tkCheckinSheet());
+    return;
+  }
+
+  const parts = [...new Set(checkins.map(c=>c.part).filter(Boolean))];
+  const recent = checkins.filter(c => tkDay(c.date) >= tkSince(30));
+  const worst = recent.reduce((m,c)=>Math.max(m,c.level||0),0);
+  const cards = el("div","tk-cards");
+  tkCard(cards, "Check-ins", String(checkins.length), "all time");
+  tkCard(cards, "Worst (30d)", String(worst), "out of 10");
+  tkCard(cards, "Tracking", String(parts.length), parts.length===1?"body part":"body parts");
+  host.appendChild(cards);
+
+  const cs = tkSection(host, "Pain over time");
+  const grid = el("div"); grid.style.display="grid"; grid.style.gap="10px";
+  let drew = false;
+  for(const part of parts){
+    const pts = checkins.filter(c => c.part === part)
+      .sort((a,b)=>(a.date||"").localeCompare(b.date||""))
+      .map(c => ({x: tkDay(c.date), y: c.level||0}));
+    if(pts.length < 2) continue;
+    drew = true;
+    grid.appendChild(tkChartCard(part, tkLine(pts,{min:0,max:10}),
+      "latest " + pts[pts.length-1].y + " / 10"));
+  }
+  if(drew) cs.appendChild(grid);
+  else cs.appendChild(el("p","fine","Two check-ins for the same body part and a chart appears here."));
+
+  const ls = tkSection(host, "Check-ins");
+  const list = el("div","tk-list");
+  for(const c of tkSorted(checkins).slice(0,40)){
+    const det = [c.level + "/10", c.atRest ? "at rest too" : "", c.otherLoad, c.note].filter(Boolean).join(" · ");
+    const row = tkRow(list, tkNice(c.date) + " — " + c.part, det, null,
+      () => { tkDrop("checkins", c.id); renderTracker(); });
+    row.style.cursor="pointer";
+    row.onclick = e => { if(!e.target.closest(".tk-x")) tkCheckinSheet(c); };
+  }
+  ls.appendChild(list);
+
+  const ps = tkSection(host, "For a doctor");
+  ps.appendChild(el("p","fine","Prints the whole history as a table &mdash; dates, body part, pain score, whether it hurt at rest, and what else you were playing."));
+  const pb = el("button","act","Print summary");
+  pb.style.marginTop = "10px";
+  pb.onclick = tkPrintInjuries;
+  ps.appendChild(pb);
+}
+
+function tkPrintInjuries(){
+  const area = $("#printArea");
+  const rows = tkSorted(TK.checkins||[]).map(c =>
+    "<tr><td>" + c.date + "</td><td>" + tkEsc(c.part||"") + "</td><td>" + (c.level==null?"":c.level) +
+    "</td><td>" + (c.atRest ? "yes" : "no") + "</td><td>" + tkEsc(c.otherLoad||"") +
+    "</td><td>" + tkEsc(c.note||"") + "</td></tr>").join("");
+  const since = (TK.sessions||[]).filter(s => tkDay(s.date) >= tkSince(30)).length;
+  area.innerHTML =
+    "<h1>Training and pain log</h1>" +
+    "<p>Printed " + new Date().toLocaleDateString() + " from Tennis Agenda. " +
+    "Self-reported by the player; not a medical record.</p>" +
+    "<p>Sessions in the last 30 days: " + since + ".</p>" +
+    "<table><thead><tr><th>Date</th><th>Body part</th><th>Pain 0-10</th><th>At rest</th>" +
+    "<th>Other sport</th><th>Notes</th></tr></thead><tbody>" + rows + "</tbody></table>";
+  window.print();
+}
+
+/* ---------------- 5. Expenses ---------------- */
+
+function tkExpenseSheet(rec){
+  rec = rec || { date: tkToday(), category: "Private lesson" };
+  let dateI, catI, amtI, noteI, saveI, labelI;
+  tkSheet(rec.id ? "Edit cost" : "Log a cost", form => {
+    dateI = tkField(form, "Date", tkDateInput(rec.date));
+    const r2 = el("div","row2"); form.appendChild(r2);
+    catI = tkField(r2, "Category", tkSelect(TK_CATS, rec.category));
+    amtI = tkField(r2, "Amount", tkNum(rec.amount, "0.00", "0.01"));
+    const saved = tkSavedTours();
+    noteI = tkField(form, "Note", tkText(rec.note, saved.length ? "coach, tournament, what it was for" : "what it was for", 100));
+    if(!rec.id){
+      const w = el("label"); w.style.display="flex"; w.style.gap="9px"; w.style.alignItems="center";
+      w.style.margin="12px 0 4px"; w.style.fontSize="14px";
+      saveI = el("input"); saveI.type="checkbox";
+      w.appendChild(saveI); w.appendChild(document.createTextNode("Save as a one-tap quick add"));
+      form.appendChild(w);
+      labelI = tkText("", "name it, e.g. Hard-court private", 40);
+      labelI.style.display = "none";
+      form.appendChild(labelI);
+      saveI.onchange = () => { labelI.style.display = saveI.checked ? "" : "none"; if(saveI.checked) labelI.focus(); };
+    }
+  }, () => {
+    const amt = amtI.value === "" ? null : +amtI.value;
+    if(amt == null || !(amt >= 0)) throw new Error("Enter an amount");
+    tkPut("expenses", Object.assign({}, rec, {
+      date: dateI.value, category: catI.value, amount: amt, note: clean(noteI.value,100)
+    }));
+    if(saveI && saveI.checked){
+      const label = clean(labelI.value,40) || catI.value;
+      tkPut("presets", { label, category: catI.value, amount: amt });
+    }
+  });
+}
+
+function tkExpenses(host){
+  tkHead(host, "Expenses", "Log cost", () => tkExpenseSheet());
+  const exp = TK.expenses||[];
+
+  /* Quick adds: the player's own rates, named by them, never guessed at. */
+  const presets = TK.presets||[];
+  if(presets.length){
+    const qs = tkSection(host, "Quick add");
+    const chips = el("div","tk-chips");
+    for(const p of presets){
+      const c = el("button","tk-chip", p.label + "  " + tkMoney(p.amount));
+      c.onclick = () => {
+        tkPut("expenses", { date: tkToday(), category: p.category, amount: p.amount, note: p.label });
+        toast(p.label + " logged","✅"); renderTracker();
+      };
+      c.oncontextmenu = e => { e.preventDefault(); tkDrop("presets", p.id); renderTracker(); };
+      chips.appendChild(c);
+    }
+    qs.appendChild(chips);
+    qs.appendChild(el("p","fine","Tap to log one instantly. Long-press or right-click a chip to remove it."));
+  }
+
+  const month = tkMonth(tkToday());
+  const thisMonth = exp.filter(e => tkMonth(e.date) === month);
+  const mTotal = thisMonth.reduce((a,e)=>a+(e.amount||0),0);
+  const year = month.slice(0,4);
+  const yTotal = exp.filter(e => (e.date||"").slice(0,4) === year).reduce((a,e)=>a+(e.amount||0),0);
+  const sess = (TK.sessions||[]).length;
+  const perSess = sess ? exp.reduce((a,e)=>a+(e.amount||0),0) / sess : null;
+
+  const cards = el("div","tk-cards");
+  tkCard(cards, "This month", tkMoney(mTotal), thisMonth.length + (thisMonth.length===1?" entry":" entries"));
+  tkCard(cards, year, tkMoney(yTotal), "so far");
+  tkCard(cards, "Per session", perSess==null ? "—" : tkMoney(perSess), "across " + sess + " logged");
+  host.appendChild(cards);
+
+  /* Budget */
+  const bs = tkSection(host, "Monthly budget");
+  const cap = TK.budget && TK.budget.monthlyCap;
+  if(cap){
+    const pct = Math.min(100, Math.round(mTotal/cap*100));
+    const bar = el("div","tk-bar");
+    const i = el("i"); i.style.width = pct + "%"; if(mTotal > cap) i.className = "over";
+    bar.appendChild(i);
+    const line = el("p","fine", tkMoney(mTotal) + " of " + tkMoney(cap) +
+      (mTotal > cap ? "  ·  over by " + tkMoney(mTotal-cap) : "  ·  " + tkMoney(cap-mTotal) + " left"));
+    bs.appendChild(line); bs.appendChild(bar);
+  } else {
+    bs.appendChild(el("p","fine","No cap set. Setting one shows a progress bar here."));
+  }
+  const capBtn = el("button","act", cap ? "Change cap" : "Set a cap");
+  capBtn.style.marginTop = "11px";
+  capBtn.onclick = () => {
+    let capI;
+    tkSheet("Monthly budget", form => {
+      capI = tkField(form, "Cap", tkNum(cap, "e.g. 600", "1"), "Leave blank to remove it.");
+    }, () => {
+      TK.budget.monthlyCap = capI.value === "" ? null : Math.max(0, +capI.value);
+      saveTK();
+    });
+  };
+  bs.appendChild(capBtn);
+
+  /* Breakdown */
+  if(exp.length){
+    const by = {};
+    for(const e of exp) by[e.category||"Other"] = (by[e.category||"Other"]||0) + (e.amount||0);
+    const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]);
+    const max = rows[0][1] || 1;
+    const cs = tkSection(host, "Where it goes");
+    const card = el("div","tk-chart");
+    for(const [cat, amt] of rows){
+      const r = el("div"); r.style.margin = "0 0 12px";
+      const top = el("div"); top.style.display="flex"; top.style.justifyContent="space-between";
+      top.style.fontSize="13.5px"; top.style.gap="12px";
+      top.appendChild(el("span",null,cat));
+      top.appendChild(el("span",null,tkMoney(amt)));
+      const bar = el("div","tk-bar"); const i = el("i");
+      i.style.width = Math.round(amt/max*100) + "%"; bar.appendChild(i);
+      r.appendChild(top); r.appendChild(bar); card.appendChild(r);
+    }
+    cs.appendChild(card);
+  }
+
+  const ls = tkSection(host, "Entries");
+  if(!exp.length){
+    tkEmpty(ls, "Nothing logged", "Lessons, restringing, entry fees, travel. Log them once and the totals look after themselves.",
+      "Log your first cost", () => tkExpenseSheet());
+  } else {
+    const list = el("div","tk-list");
+    for(const e of tkSorted(exp).slice(0,60)){
+      const row = tkRow(list, tkNice(e.date) + " — " + e.category,
+        e.note || "", tkMoney(e.amount), () => { tkDrop("expenses", e.id); renderTracker(); });
+      row.style.cursor="pointer";
+      row.onclick = ev => { if(!ev.target.closest(".tk-x")) tkExpenseSheet(e); };
+    }
+    ls.appendChild(list);
+  }
+}
+
+/* ---------------- backup ---------------- */
+
+function tkExport(){
+  const blob = new Blob([JSON.stringify(TK, null, 2)], {type:"application/json"});
+  const a = el("a"); a.href = URL.createObjectURL(blob);
+  a.download = "tennis-agenda-tracker-" + tkToday() + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  toast("Backup saved","⬇️");
+}
+function tkImport(){
+  const f = el("input"); f.type="file"; f.accept="application/json,.json";
+  f.onchange = () => {
+    const file = f.files && f.files[0]; if(!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        const data = JSON.parse(r.result);
+        if(!data || typeof data !== "object") throw new Error("bad file");
+        /* Merged, not swapped in: importing a backup should never delete
+           whatever has been logged since that backup was taken. */
+        mergeTracker(data); saveTK(); renderTracker();
+        toast("Backup merged in","✅");
+      }catch(e){ toast("That file could not be read","⚠️",5000); }
+    };
+    r.readAsText(file);
+  };
+  f.click();
+}
+
 /* ---------- section switching ---------- */
+const VIEWS = { tour:{el:"#viewTour", title:"Tournaments"},
+                mm:{el:"#viewMM",   title:"Matchmaking"},
+                track:{el:"#viewTrack", title:"Tracker"} };
 function setView(v){
-  S.view = v==="mm" ? "mm" : "tour"; saveS();
-  const mmOn = S.view==="mm";
-  $("#viewMM").hidden = !mmOn;
-  $("#viewTour").hidden = mmOn;
-  document.querySelectorAll(".viewseg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===S.view));
-  document.querySelector(".srcsel").hidden = mmOn;
-  $("#btnWatch").hidden = mmOn;
-  document.querySelector(".brand h1").textContent = mmOn ? "Matchmaking" : "Tournaments";
+  S.view = VIEWS[v] ? v : "tour"; saveS();
+  const mmOn = S.view==="mm", tourOn = S.view==="tour";
+  for(const [key,def] of Object.entries(VIEWS)) $(def.el).hidden = key !== S.view;
+  document.querySelectorAll(".viewseg button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.view===S.view)));
+  /* The source picker and the saved-tournaments button only mean anything
+     while tournaments are on screen. */
+  document.querySelector(".srcsel").hidden = !tourOn;
+  $("#btnWatch").hidden = !tourOn;
+  document.querySelector(".brand h1").textContent = VIEWS[S.view].title;
   const main=$("main"); main.classList.remove("swap"); void main.offsetWidth; main.classList.add("swap");
   if(mmOn){
     $("#whoami").textContent=[S.place||"Set your location", `within ${S.radius} mi`].join(" · ");
     renderMMNow(); renderBoardNow();
     if(canMM() && mm.ack) mmLoad();
-  } else render();
+  } else if(S.view==="track") renderTracker();
+  else render();
 }
 
 /* Checks for invitations every couple of minutes — in the tray too. */
