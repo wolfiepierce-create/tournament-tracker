@@ -244,6 +244,17 @@ header.nav{
 /* ---- Tracker ---- */
 .subseg{display:flex;gap:2px;padding:3px;margin:0 0 18px;background:var(--surface-2);border-radius:12px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .subseg::-webkit-scrollbar{display:none}
+/* Five tabs do not fit a phone in one row, and a sideways-scrolling bar hides
+   the last one behind an edge nobody thinks to drag. Two rows instead. */
+@media (max-width:430px){
+  .subseg{flex-wrap:wrap;overflow:visible}
+  .subseg button{flex:1 1 calc(33.333% - 2px)}
+}
+.tk-chipwrap{display:inline-flex;align-items:stretch}
+.tk-chipwrap .tk-chip{border-top-right-radius:0;border-bottom-right-radius:0;border-right:0}
+.tk-chipx{border:1px solid var(--line-strong);border-left:0;background:var(--surface);color:var(--ink-3);
+  border-radius:0 999px 999px 0;padding:0 12px;font:inherit;font-size:15px;line-height:1;cursor:pointer;min-height:36px}
+.tk-chipx:hover{color:var(--hot);background:var(--hot-soft)}
 .subseg button{flex:1 0 auto;min-height:38px;padding:8px 15px;font:inherit;font-size:13px;font-weight:500;border:0;background:none;color:var(--ink-2);border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .2s var(--ease-soft),color .2s var(--ease-soft)}
 .subseg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.13)}
 
